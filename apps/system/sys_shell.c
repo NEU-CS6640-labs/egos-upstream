@@ -62,7 +62,7 @@ int main() {
         }
 
         do {
-            printf("\x1B[1;32m➜ \x1B[1;36m%s\x1B[1;0m ", grass->workdir);
+            printf("\x1B[1;32m➜ \x1B[1;36m%s\x1B[1;0m %% ", grass->workdir);
         } while (earth->tty_read(buf, 256) == 0);
     }
 }
