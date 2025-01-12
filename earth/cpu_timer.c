@@ -13,23 +13,23 @@
  */
 #include "egos.h"
 
-static long long mtime_get() {
-    int low, high;
+static unsigned long long mtime_get() {
+    unsigned int low, high;
     /* Q: Why having a loop? */
     do {
-        high = *(int*)(0x200bff8 + 4);
-        low  = *(int*)(0x200bff8);
-    }  while ( *(int*)(0x200bff8 + 4) != high );
+        high = *(unsigned int*)(0x200bff8 + 4);
+        low  = *(unsigned int*)(0x200bff8);
+    }  while ( *(unsigned int*)(0x200bff8 + 4) != high );
 
-    return (((long long)high) << 32) | low;
+    return (((unsigned long long)high) << 32) | (unsigned long long)low;
 }
 
 /* set "mtimecmp" to "time" */
-static void mtimecmp_set(long long time) {
+static void mtimecmp_set(unsigned long long time) {
     /* Q: Why setting mtimecmp low to all 0xF? */
-    *(int*)(0x2004000 + 4) = 0xFFFFFFFF;
-    *(int*)(0x2004000 + 0) = (int)time;
-    *(int*)(0x2004000 + 4) = (int)(time >> 32);
+    *(unsigned int*)(0x2004000 + 4) = 0xFFFFFFFF;
+    *(unsigned int*)(0x2004000 + 0) = (unsigned int)time;
+    *(unsigned int*)(0x2004000 + 4) = (unsigned int)(time >> 32);
 }
 
 #define QUANTUM  500000
