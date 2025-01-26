@@ -6,6 +6,7 @@ struct earth {
     int (*trap_handler_register)(void (*handler)(unsigned int));
 
     void (*timer_reset)();
+    unsigned long long (*gettime)();
 
     void* (*mmu_alloc)();
     int   (*mmu_free)(int pid);
@@ -35,11 +36,14 @@ struct grass {
 
     /* Process control interface */
     int  (*proc_alloc)();
+    void (*proc_sleep)(int pid, int time_units);
     void (*proc_free)(int pid);
     void (*proc_set_ready)(int pid);
 
     /* System call interface */
     void (*sys_exit)(int status);
+    void (*sys_yield)();
+    void (*sys_sleep)(int time_units);
     int  (*sys_send)(int pid, char* msg, int size);
     int  (*sys_recv)(int* pid, char* buf, int size);
 };
@@ -83,7 +87,8 @@ extern struct grass *grass;
 #endif
 
 #define ASSERT(cond, msg)  \
-    do { if(!(cond)) {earth->tty_fatal("[ASSERT FAILED]" msg);} } while(0)
+    do { if(!(cond)) {earth->tty_fatal("[ASSERT FAILED]" msg "[file:%s, line:%d]", __FILE__, __LINE__);} } while(0)
+#define ASSERTX(cond) ASSERT(cond, "")
 
 /* Memory-mapped I/O register access macros */
 #define ACCESS(x) (*(__typeof__(*x) volatile *)(x))
@@ -93,5 +98,15 @@ extern struct grass *grass;
 /* process */
 #define MAX_NPROCESS  16
 
+/* translating between pid and idx (in proc_set) */
+#define pid2idx(pid)  ((pid>=1 && pid<=MAX_NPROCESS) ? (pid-1) \
+                            : FATAL("pid2idx: invalid pid"))
+#define idx2pid(idx)  ((idx>=0 && idx<MAX_NPROCESS) ? (idx+1) \
+                            : FATAL("idx2pid: invalid idx"))
+
 /* data types */
 typedef unsigned int m_uint32;
+typedef unsigned long long m_uint64;
+
+/* scheduler */
+#define QUANTUM  0x100000
