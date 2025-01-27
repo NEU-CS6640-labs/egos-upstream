@@ -179,7 +179,7 @@ static void consumer(void *arg){
         }
 
         void *x = slots[out];
-        slots[out] == (void*)0;
+        slots[out] = (void*)0;
         if (++out == NSLOTS) out = 0;
         printf("%s: got '%s'\n", arg, x);
         thread_yield();
