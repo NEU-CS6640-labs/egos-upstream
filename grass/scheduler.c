@@ -213,7 +213,7 @@ void proc_on_stop(int pid) {
 
 
 
-    INFO("proc %d died after %d yields, turnaround time: %.2f, response time: %.2f, cputime: %.2f",
+    INFO("proc %d finished after %d yields, turnaround time: %.2f, response time: %.2f, cputime: %.2f",
             pid, yield_num(pid),
             tar_time(pid), resp_time(pid),
             cpu_runtime(pid));
