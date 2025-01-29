@@ -68,7 +68,7 @@ void proc_yield() {
 
     /* Switch to the next runnable process and reset timer */
     proc_curr_idx = next_idx;
-    ASSERT(curr_pid > 0 && curr_pid < pid2idx(MAX_NPROCESS), \
+    ASSERT(curr_pid > 0 && curr_pid <= MAX_NPROCESS, \
             "proc_yield: invalid pid to switch");
     earth->mmu_switch(curr_pid);
     earth->timer_reset();
