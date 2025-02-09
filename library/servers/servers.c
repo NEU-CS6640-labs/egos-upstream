@@ -27,7 +27,8 @@ int dir_lookup(int dir_ino, char* name) {
     strcpy(req.name, name);
     grass->sys_send(GPID_DIR, (void*)&req, sizeof(req));
 
-    grass->sys_recv(&sender, buf, SYSCALL_MSG_LEN);
+    sender = GPID_DIR;
+    grass->sys_recv(&sender, buf, sizeof(struct dir_reply));
     if (sender != GPID_DIR) FATAL("dir_lookup: an error occurred");
     struct dir_reply *reply = (void*)buf;
 
