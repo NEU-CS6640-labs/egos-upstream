@@ -42,7 +42,8 @@ int file_read(int file_ino, int offset, char* block) {
     req.offset = offset;
     grass->sys_send(GPID_FILE, (void*)&req, sizeof(req));
 
-    grass->sys_recv(&sender, buf, SYSCALL_MSG_LEN);
+    sender = GPID_FILE;
+    grass->sys_recv(&sender, buf, sizeof(struct file_reply));
     if (sender != GPID_FILE) FATAL("file_read: an error occurred");
     struct file_reply *reply = (void*)buf;
     memcpy(block, reply->block.bytes, BLOCK_SIZE);
