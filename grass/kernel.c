@@ -82,15 +82,38 @@ void trap_handler(unsigned int mcause) {
     // jump to ctx_entry
 }
 
+
+void manage_userstack(int save) {
+    // FIXME later:
+    // a better approach is to use the original process's stack
+    // but for now, they are somewhere unknown. To do so, we need to walk the page table
+    static struct {char data[PAGE_SIZE];} proc_stack[MAX_NPROCESS];
+
+    int stack_size = APPS_STACK_TOP - (m_uint32)proc_set[proc_curr_idx].sp;
+    ASSERTX(stack_size <= PAGE_SIZE);
+    if (save) {  // save the current stack to tmp stack arr
+        memcpy(&proc_stack[curr_pid], proc_set[proc_curr_idx].sp, stack_size);
+    } else {  // restore pid's stack from the tmp stack arr
+        memcpy(proc_set[proc_curr_idx].sp, &proc_stack[curr_pid], stack_size);
+    }
+}
+
+
 void ctx_entry() {
     /* Now on the kernel stack */
     int mepc, ignore;
     asm("csrr %0, mepc" : "=r"(mepc));
     proc_set[proc_curr_idx].mepc = (void*) mepc;
 
+    // save the current proc's user stack
+    manage_userstack(1/*save user stack*/);
+
     /* handle either interrupt or exception */
     int id = trap_cause & 0x3FF;
     (trap_cause & (1 << 31)) ? intr_entry(id) : excp_entry(id);
+
+    // restore user stack of the chosen proc
+    manage_userstack(0/*restore user stack*/);
 
     /* [lab4-ex3]
      * TODO: the kernel will switch privilege level here:
