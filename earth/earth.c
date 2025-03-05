@@ -49,9 +49,14 @@ static int grass_read(int block_no, char* dst) {
 }
 
 int main() {
-    /* Prepare the bss and data memory regions */
-    memset(&bss_start, 0, (&bss_end - &bss_start));
-    memcpy(&data_start, &data_rom, (&data_end - &data_start));
+    m_uint32 core_id;
+    asm("csrr %0, mhartid" : "=r"(core_id));
+
+    /* Disable core#0 on QEMU because it is an E31 core without S-mode */
+    /* See https://www.qemu.org/docs/master/system/riscv/sifive_u.html */
+    if (core_id != 0) {
+        while (1);
+    }
 
     /* Initialize the earth layer */
     earth_init();
@@ -60,14 +65,9 @@ int main() {
     elf_load(0, grass_read, 0, 0);
 
     /* Enable machine-mode interrupt before entering supervisor mode */
+    earth->timer_reset();
     earth->intr_enable();
 
-    int mstatus;
-    /* Enter supervisor mode after mret */
-    asm("csrr %0, mstatus" : "=r"(mstatus));
-    asm("csrw mstatus, %0" ::"r"((mstatus & ~(3 << 11))   /* clear MPP */
-                                          | (1 << 11) )); /* set MPP to S */
-    /* Enter the grass layer after mret */
-    asm("csrw mepc, %0" ::"r"(GRASS_ENTRY));
-    asm("mret");
+    void (*grass_entry)() = (void*)GRASS_ENTRY;
+    grass_entry();
 }

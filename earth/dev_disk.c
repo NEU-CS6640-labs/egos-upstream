@@ -14,10 +14,7 @@
 #include "bus_gpio.c"
 #include <string.h>
 
-enum {
-      FLASH_ROM
-};
-static int type;
+static enum disk_type { FLASH_ROM, SD_CARD } type;
 
 int disk_read(int block_no, int nblocks, char* dst) {
     if (type == FLASH_ROM) {
