@@ -5,6 +5,8 @@ SYSCALLFUNC=SOFTTIMER
 # [lab5]: TODO: change  "VMOFF" to "VMON"
 IFVM=VMOFF
 
+CPU_TYPE=SIFIVE_U
+
 RISCV_QEMU = qemu-system-riscv32
 RISCV_CC = riscv64-unknown-elf-gcc
 OBJDUMP = riscv64-unknown-elf-objdump
@@ -24,10 +26,11 @@ USRAPP_HEADERS = $(wildcard apps/user/*.h)
 CFLAGS = -march=rv32i -mabi=ilp32 -mcmodel=medlow -ffunction-sections -fdata-sections -fno-common -ggdb -g
 LDFLAGS = -Wl,--gc-sections -nostartfiles -nostdlib
 INCLUDE = -Ilibrary -Ilibrary/elf -Ilibrary/libc -Ilibrary/file -Ilibrary/servers
-QEMU_FLAGS = -bios none -readconfig $(QEMU)/sifive-e31.cfg -kernel $(QEMU)/qemu.elf -nographic
+# QEMU_FLAGS = -bios none -readconfig $(QEMU)/sifive-e31.cfg -kernel $(QEMU)/qemu.elf -nographic
+QEMU_FLAGS = -bios none -readconfig $(QEMU)/sifive-u540.cfg -nographic
 VERBOSE_LINKER = -Xlinker --verbose
 
-COMMON = $(CFLAGS) $(LDFLAGS) $(INCLUDE) -D CPU_CLOCK_RATE=65000000 -D$(SCHEDULER) -D$(SYSCALLFUNC) -D$(IFVM)
+COMMON = $(CFLAGS) $(LDFLAGS) $(INCLUDE) -D CPU_CLOCK_RATE=65000000 -D$(SCHEDULER) -D$(SYSCALLFUNC) -D$(IFVM) -D$(CPU_TYPE)
 
 APPS_LD = -Tapps/app.lds -lc -lgcc
 GRASS_LD = -Tgrass/grass.lds -lc -lgcc
@@ -96,15 +99,15 @@ install:
 
 qemu:
 	@echo "$(YELLOW)-------- Simulate on QEMU-RISCV --------$(END)"
-	cp $(RELEASE)/earth.elf $(QEMU)/qemu.elf
-	$(OBJCOPY) --update-section .image=$(TOOLS)/disk.img $(QEMU)/qemu.elf
+	cp $(RELEASE)/earth.elf $(QEMU)/egos.bin
+	$(OBJCOPY) --update-section .image=$(TOOLS)/disk.img $(QEMU)/egos.bin
 	$(RISCV_QEMU) $(QEMU_FLAGS)
 
 qemu-gdb:
 	@echo "$(YELLOW)-------- Simulate on QEMU-RISCV (with GDB) --------$(END)"
 	@echo "$(YELLOW)-------- run 'gdb' in another window --------$(END)"
-	cp $(RELEASE)/earth.elf $(QEMU)/qemu.elf
-	$(OBJCOPY) --update-section .image=$(TOOLS)/disk.img $(QEMU)/qemu.elf
+	cp $(RELEASE)/earth.elf $(QEMU)/egos.bin
+	$(OBJCOPY) --update-section .image=$(TOOLS)/disk.img $(QEMU)/egos.bin
 	$(RISCV_QEMU) $(QEMU_FLAGS) -S $(QEMUGDB)
 
 clean:
