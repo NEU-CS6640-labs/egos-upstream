@@ -54,28 +54,53 @@ extern struct grass *grass;
 /* Memory layout */
 #define PAGE_SIZE          4096        /* 4KB */
 
-/* DTIM (see FE310-QEMU Memory Map) */
-#define FREE_MEM_END       0x80400000  /*        end of DTIM           */
-#define FREE_MEM_START     0x80004000  /*        free memory           */
-                                       /* 128B   earth interface       */
-#define GRASS_STACK_TOP    0x80003f80  /* 8KB    earth/grass stack     */
-                                       /*        grass interface       */
-#define APPS_STACK_TOP     0x80002000  /* 6KB    app stack             */
-#define SYSCALL_ARG        0x80000400  /* 1KB    system call args      */
-#define APPS_ARG           0x80000000  /* 1KB    app main() argc, argv */
+#ifdef SIFIVE_U
+
+  #define GRASS_SIZE         0x00100000  /* 1MB */
+  #define APPS_SIZE          0x00004000  /* 16KB */
+
+  /* Memory regions */
+  #define FREE_MEM_END      0x81000000 /* 16MB memory in total     */
+  #define FREE_MEM_START    0x80800000 /* 8MB⬆️ free for mmu_alloc */
+  #define APPS_STACK_TOP    0x80800000 /* 2MB⬇️ app stack          */
+  #define SYSCALL_ARG       0x80601000 /* struct syscall           */
+  #define APPS_ARG          0x80600000 /* main() argc/argv         */
+  #define APPS_ENTRY        0x80400000 /* 2MB⬆️ app code and data  */
+
+  #define GRASS_STACK_TOP   0x80400000 /* 2MB⬇️ egos stack         */
+  #define GRASS_STRUCT_BASE 0x80201000 /* struct grass             */
+  #define EARTH_STRUCT_BASE 0x80200000 /* struct earth             */
+                                       /* 1MB    grass code+data  */
+  #define GRASS_ENTRY       0x80100000 /* grass code start        */
+                                       /* 1MB    earth data       */
+                                       /* earth code start        */
+  #define RAM_START         0x80000000 /* 2MB⬆️ egos code and data */
+
+#else
+
+  /* DTIM (see FE310-QEMU Memory Map) */
+  #define FREE_MEM_END       0x80400000  /*        end of DTIM           */
+  #define FREE_MEM_START     0x80004000  /*        free memory           */
+                                         /* 128B   earth interface       */
+  #define GRASS_STACK_TOP    0x80003f80  /* 8KB    earth/grass stack     */
+                                         /*        grass interface       */
+  #define APPS_STACK_TOP     0x80002000  /* 6KB    app stack             */
+  #define SYSCALL_ARG        0x80000400  /* 1KB    system call args      */
+  #define APPS_ARG           0x80000000  /* 1KB    app main() argc, argv */
 
 
-/* ITIM (see FE310-QEMU Memory Map) */
-#define GRASS_SIZE         0x00100000  /* 1MB */
-#define APPS_SIZE          0x00004000  /* 16KB */
+  /* ITIM (see FE310-QEMU Memory Map) */
+  #define GRASS_SIZE         0x00100000  /* 1MB */
+  #define APPS_SIZE          0x00004000  /* 16KB */
 
-#define ITIM_END           0x0a000000  /*        end of ITIM           */
-#define APPS_ENTRY         0x08200000  /* 1MB    app code+data         */
-#define GRASS_ENTRY        0x08100000  /* 1MB    grass code+data       */
-                                       /* 1MB    earth data            */
-                                       /* earth code is in QSPI flash  */
-#define ITIM_START         0x08000000
+  #define ITIM_END           0x0a000000  /*        end of ITIM           */
+  #define APPS_ENTRY         0x08200000  /* 1MB    app code+data         */
+  #define GRASS_ENTRY        0x08100000  /* 1MB    grass code+data       */
+                                         /* 1MB    earth data            */
+                                         /* earth code is in QSPI flash  */
+  #define ITIM_START         0x08000000
 
+#endif
 
 #ifndef LIBC_STDIO
 /* Only earth/dev_tty.c uses LIBC_STDIO and does not need these macros */

@@ -4,63 +4,55 @@ ENTRY(_enter)
 
 MEMORY
 {
-    ram (arw!xi) : ORIGIN = 0x08000000, LENGTH = 0x100000
-    rom (irx!wa) : ORIGIN = 0x20400000, LENGTH = 0x400000
+    code (rx) : ORIGIN = 0x80000000, LENGTH = 0x20000
+    data (rw) : ORIGIN = 0x80020000, LENGTH = 0x20000
     disk(irx!wa) : ORIGIN = 0x20800000, LENGTH = 0x400000
 }
 
 PHDRS
 {
-    rom PT_LOAD;
-    ram_init PT_LOAD;
-    ram PT_LOAD;
+    code PT_LOAD;
+    data PT_LOAD;
     disk PT_LOAD;
 }
 
 SECTIONS
 {
-    /* ROM Sections */
-    .init : {
+    .init : ALIGN(8) {
         *(.text.enter)
-    } >rom :rom
+    } >code :code
 
-    .text : {
+    .text : ALIGN(8) {
         *(.text .text.*)
-    } >rom :rom
+    } >code :code
 
-    .rodata : {
+    .rodata : ALIGN(8) {
         *(.rdata)
         *(.rodata .rodata.*)
         . = ALIGN(8);
         *(.srodata .srodata.*)
-    } >rom :rom
+    } >data :data
 
-    /* RAM Sections */
     .data : ALIGN(8) {
         *(.data .data.*)
         . = ALIGN(8);
         *(.sdata .sdata.* .sdata2.*)
-    } >ram AT>rom :ram_init
+    } >data :data
 
     .bss (NOLOAD): ALIGN(8) {
         *(.sbss*)
         *(.bss .bss.*)
         *(COMMON)
-    } >ram :ram 
+    } >data :data
 
     .heap (NOLOAD) : ALIGN(8) {
         PROVIDE( __heap_start = . );
-    } >ram :ram
+    } >data :data
 
     .image : {
         *(.image.placeholder);
         . += 0x400000;
     } >disk :disk
 
-    PROVIDE( bss_start = ADDR(.bss) );
-    PROVIDE( bss_end = ADDR(.bss) + SIZEOF(.bss) );
-    PROVIDE( data_rom = LOADADDR(.data) );
-    PROVIDE( data_start = ADDR(.data) );
-    PROVIDE( data_end = ADDR(.data) + SIZEOF(.data) );
-    PROVIDE( __heap_end = ADDR(.data) + 0x2800 );
+    PROVIDE( __heap_end = 0x80100000 );
 }

@@ -16,5 +16,5 @@ _enter:
     csrrc t1, mstatus, t0
 
     /* Call main() of earth.c */
-    li sp, 0x80003f80
+    li sp, 0x80400000
     call main

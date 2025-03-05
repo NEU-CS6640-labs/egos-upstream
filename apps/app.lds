@@ -4,7 +4,7 @@ ENTRY(_enter)
 
 MEMORY
 {
-    ram (arw!xi) : ORIGIN = 0x08200000, LENGTH = 0x4000
+    ram (arw!xi) : ORIGIN = 0x80400000, LENGTH = 0x200000
 }
 
 PHDRS
@@ -41,5 +41,5 @@ SECTIONS
         PROVIDE( __heap_start = . );
     } >ram :ram
 
-    PROVIDE( __heap_end = 0x08204000 );
+    PROVIDE( __heap_end = 0x80600000 );
 }

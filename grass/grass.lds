@@ -4,7 +4,7 @@ ENTRY(_enter)
 
 MEMORY
 {
-    ram (arw!xi) : ORIGIN = 0x08100000, LENGTH = 0x100000
+    ram (arw!xi) : ORIGIN = 0x80100000, LENGTH = 0x100000
 }
 
 PHDRS
@@ -40,6 +40,6 @@ SECTIONS
     .heap (NOLOAD) : ALIGN(8) {
           PROVIDE( __heap_start = . );
     } >ram :ram
-    PROVIDE( __heap_end = 0x08200000 );
+    PROVIDE( __heap_end = 0x80200000 );
 
 }

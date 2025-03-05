@@ -9,5 +9,5 @@
     .section .text
     .global _enter
 _enter:
-    li sp,0x80003f80
+    li sp,0x80400000
     call main

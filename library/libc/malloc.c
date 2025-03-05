@@ -20,9 +20,8 @@ static char* brk = &__heap_start;
  */
 
 char *_sbrk(int size) {
-    char* heap_end = (char*)0xa000000;
-    if (brk + size > heap_end) {
-        printf("_sbrk: heap grows too large (%p + %d > %p)\n", brk, size, heap_end);
+    if (brk + size > (char*)&__heap_end) {
+        printf("_sbrk: heap grows too large (%p + %d > %p)\n", brk, size, &__heap_end);
         earth->tty_write("_sbrk: heap grows too large\r\n", 29);
         *(int*)(0xFFFFFFF0) = 1; /* Trigger a memory exception */
     }
