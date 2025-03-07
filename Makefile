@@ -4,6 +4,8 @@ SCHEDULER=NAIVE
 SYSCALLFUNC=SOFTTIMER
 # [lab5]: TODO: change  "VMOFF" to "VMON"
 IFVM=VMOFF
+# [lab6]: TODO: change  "FLASH" to "SDCARD"
+DISK=FLASH
 
 CPU_TYPE=SIFIVE_U
 
@@ -30,7 +32,7 @@ INCLUDE = -Ilibrary -Ilibrary/elf -Ilibrary/libc -Ilibrary/file -Ilibrary/server
 QEMU_FLAGS = -bios none -readconfig $(QEMU)/sifive-u540.cfg -nographic
 VERBOSE_LINKER = -Xlinker --verbose
 
-COMMON = $(CFLAGS) $(LDFLAGS) $(INCLUDE) -D CPU_CLOCK_RATE=65000000 -D$(SCHEDULER) -D$(SYSCALLFUNC) -D$(IFVM) -D$(CPU_TYPE)
+COMMON = $(CFLAGS) $(LDFLAGS) $(INCLUDE) -D$(CPU_TYPE) -D CPU_CLOCK_RATE=65000000 -D$(SCHEDULER) -D$(SYSCALLFUNC) -D$(IFVM) -D$(DISK)
 
 APPS_LD = -Tapps/app.lds -lc -lgcc
 GRASS_LD = -Tgrass/grass.lds -lc -lgcc
