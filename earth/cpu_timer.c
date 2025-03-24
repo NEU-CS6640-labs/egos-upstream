@@ -41,8 +41,8 @@ m_uint64 gettime() {
     m_uint64 time = (m_uint64) mtime_get();
     if (time < last_time) {
         INFO("gettime() overflows");
-        last_time = time;
     }
+    last_time = time;
     return time;
 }
 
