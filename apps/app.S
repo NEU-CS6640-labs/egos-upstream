@@ -1,15 +1,15 @@
 /*
- * (C) 2022, Cornell University
+ * (C) 2026, Cornell University
  * All rights reserved.
- */
-
-/* Author: Yunhao Zhang
- * Description: initialize the stack pointer and call application main()
+ *
+ * Description: entry point of applications
+ * Initialize stack pointer and call the application main().
  */
     .section .text
-    .global _enter
-_enter:
-    lw a0, 0(a0) /* a0 holds APPS_ARG, the address of integer argc */
-    li sp,0x80002000
+    .global app_entry
+app_entry:
+    /* a0 holds the address of argc; See kernel.c for details. */
+    lw a0, 0(a0)
+    li sp,0x80400000
     call main
     call exit

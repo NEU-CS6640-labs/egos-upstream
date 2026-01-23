@@ -1,53 +1,37 @@
 /*
- * (C) 2022, Cornell University
- * All rights reserved.
+ * Description: CPU timer
+ *
+ * Updated by CS6640 26spring staff.
  */
 
-/* Author: Yunhao Zhang
- * Description: timer reset and initialization
- * mtime is at 0x200bff8 and mtimecmp is at 0x2004000 in the memory map
- * see section 3.1.15 of references/riscv-privileged-v1.10.pdf
- * and section 9.1, 9.3 of references/sifive-fe310-v19p04.pdf
- *
- * updated by CS6640 23fall staff
- */
 #include "egos.h"
 
-static long long mtime_get() {
-    int low, high;
-    /* Q: Why having a loop? */
+#define MTIME_BASE    (CLINT_BASE + 0xBFF8)
+#define MTIMECMP_BASE (CLINT_BASE + 0x4000)
+#define QUANTUM       100000UL
+
+ulonglong mtime_get() {
+    uint low, high;
     do {
-        high = *(int*)(0x200bff8 + 4);
-        low  = *(int*)(0x200bff8);
-    }  while ( *(int*)(0x200bff8 + 4) != high );
+        high = REGW(MTIME_BASE, 4);
+        low  = REGW(MTIME_BASE, 0);
+    } while (REGW(MTIME_BASE, 4) != high);
 
-    return (((long long)high) << 32) | low;
+    return (((ulonglong)high) << 32) | low;
 }
 
-/* set "mtimecmp" to "time" */
-static void mtimecmp_set(long long time) {
-    /* Q: Why setting mtimecmp low to all 0xF? */
-    *(int*)(0x2004000 + 4) = 0xFFFFFFFF;
-    *(int*)(0x2004000 + 0) = (int)time;
-    *(int*)(0x2004000 + 4) = (int)(time >> 32);
+static void mtimecmp_set(ulonglong time, uint core_id) {
+    REGW(MTIMECMP_BASE, core_id * 8 + 4) = 0xFFFFFFFF;
+    REGW(MTIMECMP_BASE, core_id * 8 + 0) = (uint)time;
+    REGW(MTIMECMP_BASE, core_id * 8 + 4) = (uint)(time >> 32);
 }
 
-void timer_reset() {
-    mtimecmp_set(mtime_get() + QUANTUM);
+static void timer_reset(uint core_id) {
+    mtimecmp_set(mtime_get() + QUANTUM, core_id);
 }
 
-m_uint64 gettime() {
-    static m_uint64 last_time = 0;
-    m_uint64 time = (m_uint64) mtime_get();
-    if (time < last_time) {
-        INFO("gettime() overflows");
-        last_time = time;
-    }
-    return time;
-}
-
-void timer_init() {
+void timer_init(uint core_id) {
+    /* Initialize the timer. */
     earth->timer_reset = timer_reset;
-    earth->gettime = gettime;
+    mtimecmp_set(0x0FFFFFFFFFFFFFFFUL, core_id);
 }
-

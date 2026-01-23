@@ -1,106 +1,94 @@
 #pragma once
 
+typedef unsigned char uchar;
+typedef unsigned short ushort;
+typedef unsigned int uint;
+typedef unsigned long long ulonglong;
+
 struct earth {
-    /* CPU interface */
-    int (*intr_enable)();
-    int (*trap_handler_register)(void (*handler)(unsigned int));
+    uint (*mmu_alloc)();
+    void (*mmu_free)(int pid);
+    void (*mmu_flush_cache)();
+    void (*timer_reset)(uint core_id);
 
-    void (*timer_reset)();
-    unsigned long long (*gettime)();
+    void (*mmu_map)(int pid, uint vpage_no, uint ppage_id);
+    uint (*mmu_translate)(int pid, uint vaddr);
+    void (*mmu_switch)(int pid);
 
-    void* (*mmu_alloc)();
-    int   (*mmu_free)(int pid);
-    int   (*mmu_map)(int pid, void *src, void *dst);
-    int   (*mmu_switch)(int pid);
-    void* (*mmu_translate)(int pid, void *pa);
+    void (*tty_read)(char* c);
+    void (*tty_write)(char c);
+    uint (*tty_input_empty)();
+    void (*disk_read)(uint block_no, uint nblocks, char* dst);
+    void (*disk_write)(uint block_no, uint nblocks, char* src);
 
-    /* Devices interface */
-    int (*disk_read)(int block_no, int nblocks, char* dst);
-    int (*disk_write)(int block_no, int nblocks, char* src);
-
-    int (*tty_intr)();
-    int (*tty_read)(char* buf, int len);
-    int (*tty_write)(char* buf, int len);
-
-    int (*tty_printf)(const char *format, ...);
-    int (*tty_info)(const char *format, ...);
-    int (*tty_fatal)(const char *format, ...);
-    int (*tty_success)(const char *format, ...);
-    int (*tty_critical)(const char *format, ...);
+    enum { PAGE_TABLE, SOFT_TLB } translation;
 };
 
 struct grass {
-    /* Shell environment variables */
-    int workdir_ino;
-    char workdir[128];
-
-    /* Process control interface */
-    int  (*proc_alloc)();
-    void (*proc_sleep)(int pid, int time_units);
+    int (*proc_alloc)();
     void (*proc_free)(int pid);
     void (*proc_set_ready)(int pid);
 
-    /* System call interface */
-    void (*sys_exit)(int status);
-    void (*sys_yield)();
-    void (*sys_sleep)(int time_units);
-    int  (*sys_send)(int pid, char* msg, int size);
-    int  (*sys_recv)(int* pid, char* buf, int size);
+    void (*sys_send)(int receiver, char* msg, uint size);
+    void (*sys_recv)(int from, int* sender, char* buf, uint size);
+    /* Student's code goes here (System Call | Multicore & Locks). */
+
+    /* Add interface functions for process sleep and multicore information. */
+
+    /* Student's code ends here. */
 };
 
-extern struct earth *earth;
-extern struct grass *grass;
+extern struct earth* earth;
+extern struct grass* grass;
 
-/* Memory layout */
-#define PAGE_SIZE          4096        /* 4KB */
+/* Below is the physical memory layout in egos-2k+. */
+#define RAM_END         0x80800000UL /* 8MB memory starting at RAM_START */
+#define APPS_PAGES_BASE 0x80400000UL /* 4MB free for mmu_alloc           */
+#define APPS_STACK_TOP  0x80400000UL /* 1MB app stack (growing down)     */
+#define SHELL_WORK_DIR  0x80302000UL /* current work directory for shell */
+#define SYSCALL_ARG     0x80301000UL /* struct syscall                   */
+#define APPS_ARG        0x80300000UL /* main() arguments (argc and argv) */
+#define APPS_ENTRY      0x80200000UL /* 1MB app code and data            */
+#define EGOS_STACK_TOP  0x80200000UL /* 1MB egos stack (growing down)    */
+#define GRASS_STRUCT    0x80101000UL /* struct grass                     */
+#define EARTH_STRUCT    0x80100000UL /* struct earth                     */
+#define RAM_START       0x80000000UL /* 1MB egos code and data           */
 
-/* DTIM (see FE310-QEMU Memory Map) */
-#define FREE_MEM_END       0x80400000  /*        end of DTIM           */
-#define FREE_MEM_START     0x80004000  /*        free memory           */
-                                       /* 128B   earth interface       */
-#define GRASS_STACK_TOP    0x80003f80  /* 8KB    earth/grass stack     */
-                                       /*        grass interface       */
-#define APPS_STACK_TOP     0x80002000  /* 6KB    app stack             */
-#define SYSCALL_ARG        0x80000400  /* 1KB    system call args      */
-#define APPS_ARG           0x80000000  /* 1KB    app main() argc, argv */
+#define PAGE_SIZE          4096
+#define APPS_PAGES_CNT     ((RAM_END - APPS_PAGES_BASE) / PAGE_SIZE)
 
+/* Below is the memory-mapped I/O layout for QEMU virt machine. */
+#define SDHCI_PCI_ECAM     0x30008000UL
+#define SDHCI_BASE         0x40000000UL
+#define ETH_PCI_ECAM       0x30018000UL
+#define ETH_CTL_BASE       0x41000000UL
+#define UART_BASE          0x10000000UL
+#define CLINT_BASE         0x02000000UL
+#define CLINT_MSIP(hartid) (CLINT_BASE + 4UL*(hartid))
+#define FLASH_ROM_BASE     0x22000000UL
+#define VIDEO_FRAME_BASE   0x42000000UL
 
-/* ITIM (see FE310-QEMU Memory Map) */
-#define GRASS_SIZE         0x00100000  /* 1MB */
-#define APPS_SIZE          0x00004000  /* 16KB */
+/* Below are some common macros/declarations for I/O, multicore and printing. */
+#define ACCESS(x)          (*(__typeof__(*x) volatile*)(x))
+#define REGW(base, offset) (ACCESS((uint*)(base + offset)))
+#define REGB(base, offset) (ACCESS((uchar*)(base + offset)))
 
-#define ITIM_END           0x0a000000  /*        end of ITIM           */
-#define APPS_ENTRY         0x08200000  /* 1MB    app code+data         */
-#define GRASS_ENTRY        0x08100000  /* 1MB    grass code+data       */
-                                       /* 1MB    earth data            */
-                                       /* earth code is in QSPI flash  */
-#define ITIM_START         0x08000000
+#define NCORES     4
+#define release(x) __sync_lock_release(&x);
+#define acquire(x) while (__sync_lock_test_and_set(&x, 1) != 0);
+extern int boot_lock, kernel_lock, booted_core_cnt;
 
+#define printf my_printf
+int INFO(const char* format, ...);
+int FATAL(const char* format, ...);
+int SUCCESS(const char* format, ...);
+int CRITICAL(const char* format, ...);
+int my_printf(const char* format, ...);
 
-#ifndef LIBC_STDIO
-/* Only earth/dev_tty.c uses LIBC_STDIO and does not need these macros */
-#define printf             earth->tty_printf
-#define INFO               (void)
-#define FATAL              earth->tty_fatal
-#define SUCCESS            (void)
-#define CRITICAL           earth->tty_critical
-#endif
-
-#define ASSERT(cond, msg)  \
-    do { if(!(cond)) {earth->tty_fatal("[ASSERT FAILED]" msg "[file:%s, line:%d]", __FILE__, __LINE__);} } while(0)
-#define ASSERTX(cond) ASSERT(cond, "")
-
-/* Memory-mapped I/O register access macros */
-#define ACCESS(x) (*(__typeof__(*x) volatile *)(x))
-#define REGW(base, offset) (ACCESS((unsigned int*)(base + offset)))
-#define REGB(base, offset) (ACCESS((unsigned char*)(base + offset)))
-
-/* process */
-#define MAX_NPROCESS  16
-
-/* data types */
-typedef unsigned int m_uint32;
-typedef unsigned long long m_uint64;
-
-/* scheduler */
-#define QUANTUM  0x100000
+#define ASSERT(cond, msg)                         \
+  do {                                            \
+    if (!(cond)) {                                \
+      FATAL("ASSERT failed: %s (%s:%d: %s)\n\t%s",\
+        #cond, __FILE__, __LINE__, __func__, msg);\
+    }                                             \
+  } while (0)

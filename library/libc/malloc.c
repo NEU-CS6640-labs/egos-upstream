@@ -1,33 +1,28 @@
 /*
- * (C) 2022, Cornell University
+ * (C) 2026, Cornell University
  * All rights reserved.
- */
-
-/* Author: Yunhao Zhang
- * Description: system support to C library function malloc()
  *
- * updated by CS6640 23fall staff
+ * Description: system support for C library function malloc()
  */
 
 #include "egos.h"
 
+/* Heap start and end are defined in library/elf/{egos/app}.lds. */
 extern char __heap_start, __heap_end;
 static char* brk = &__heap_start;
 
 /* malloc() and free() are linked from the compiler's C library;
  * malloc() and free() manage the memory region [&__heap_start, brk).
- * If malloc() finds this region to be too small, it will call _sbrk().
+ * If malloc() finds it too small, malloc() will call _sbrk() to increase brk.
  */
 
-char *_sbrk(int size) {
-    char* heap_end = (char*)0xa000000;
-    if (brk + size > heap_end) {
-        printf("_sbrk: heap grows too large (%p + %d > %p)\n", brk, size, heap_end);
-        earth->tty_write("_sbrk: heap grows too large\r\n", 29);
-        *(int*)(0xFFFFFFF0) = 1; /* Trigger a memory exception */
+char* _sbrk(int size) {
+    if (brk + size > (char*)&__heap_end) {
+        printf("_sbrk: heap grows too large\n\r");
+        *(int*)(0) = 1; /* Trigger a memory exception. */
     }
 
-    char *old_brk = brk;
+    char* old_brk = brk;
     brk += size;
     return old_brk;
 }

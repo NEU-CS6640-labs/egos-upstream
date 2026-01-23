@@ -1,104 +1,145 @@
 /*
- * (C) 2022, Cornell University
+ * (C) 2026, Cornell University
  * All rights reserved.
- */
-
-/* Author: Yunhao Zhang
- * Description: create the disk image file (disk.img)
- * The disk image should be exactly 4MB:
- *     the first 1MB is reserved as 256 frames for memory paging;
- *     the next  1MB contains some ELF binary executables for booting;
- *     the last  2MB is managed by a file system.
- * The output is in binary format (disk.img).
  *
- * Updated by CS6640 23fall staff
+ * Description: generate disk image (disk.img) and QEMU ROM image (qemuROM.bin)
+ * The disk image should be exactly 4MB:
+ *     2MB holds the executables of EGOS and system servers;
+ *     2MB is managed by a file system.
+ * This disk image should be programmed to the microSD card.
+ *
+ * The QEMU ROM image should be exactly 32MB with 16 x 2MB blocks.
  */
 
 #include <stdio.h>
+#include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <dirent.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include "inode.h"
 
-#include "disk.h"
-#include "file.h"
+char* egos_binaries[] = {"./egos.bin",
+                         "../build/release/sys_proc.elf",
+                         "../build/release/sys_terminal.elf",
+                         "../build/release/sys_file.elf",
+                         "../build/release/sys_shell.elf"
+                         /* "./images/Bohr.bmp" - for video demo (student TODO) */};
+#define EGOS_BIN_NUM ((sizeof(egos_binaries) / sizeof(char*)))
 
-#define NKERNEL_PROC 1
-char* kernel_processes[] = {
-                            "../build/release/grass.elf",
-};
+char bin_dir[256] = "./   6 ../   0 ";
+char* contents[]  = {
+    "./   0 ../   0 home/   1 bin/   6 ",
+    "./   1 ../   0 cs6640/   2 ta/    3 fs/       4 ",
+    "./   2 ../   1 README   5 ",
+    "./   3 ../   1 ",
+    "./   4 ../   1 ",
+    "Welcome to CS6640 labs. \nThis OS is tailored from egos-2000 (https://github.com/yhzhang0128/egos-2000).\n",
+    bin_dir};
+#define BIN_DIR_INODE ((sizeof(contents) / sizeof(char*)) - 1)
 
+char inode[SIZE_2MB], tmp[512];
+char exec[SIZE_2MB], fs[SIZE_2MB];
 
-char fs[FS_DISK_SIZE], exec[GRASS_EXEC_SIZE];
-
-inode_intf ramdisk_init();
-
-int main() {
-    /* Paging area */
-    freopen("disk.img", "w", stdout);
-    write(1, exec, PAGING_DEV_SIZE); // 1MB buffer
-
-    /* Grass kernel processes */
-    int exec_size = GRASS_EXEC_SIZE / GRASS_NEXEC;
-    fprintf(stderr, "[INFO] Loading %d kernel binary files\n", NKERNEL_PROC);
-
-    for (int i = 0; i < NKERNEL_PROC; i++) {
-        struct stat st;
-        stat(kernel_processes[i], &st);
-        assert((st.st_size > 0) && (st.st_size <= exec_size));
-        fprintf(stderr, "[INFO] Loading %s: %ld bytes\n", kernel_processes[i], (long)st.st_size);
-
-        // open kernel process elf and use stdin (0) as file descriptor
-        freopen(kernel_processes[i], "r", stdin);
-        memset(exec, 0, GRASS_EXEC_SIZE);
-
-        // read kernel process elf to the buffer "exec"
-        for (int nread = 0; nread < st.st_size; )
-            nread += read(0, exec + nread, exec_size - nread);
-
-        // write kernel process elf to disk.img
-        write(1, exec, st.st_size);
-
-        // write kernel process elf again and fill in the gap
-        write(1, &exec[st.st_size], exec_size - st.st_size);
+int load_file(char* file_name, char* dst) {
+    struct stat st;
+    stat(file_name, &st);
+    int fd = open(file_name, O_RDONLY);
+    for (uint nread = 0; nread < st.st_size;) {
+        nread += read(fd, dst + nread, st.st_size - nread);
     }
+    close(fd);
 
-    // fill in empty for the remaining 1MB space
-    memset(exec, 0, GRASS_EXEC_SIZE);
-    write(1, exec, (GRASS_NEXEC - NKERNEL_PROC) * exec_size);
-
-    /* File system */
-    write(1, fs, FS_DISK_SIZE);
-    fclose(stdout);
-
-    fprintf(stderr, "[INFO] Finish making the disk image (tools/disk.img)\n");
-    return 0;
+    return st.st_size;
 }
 
+int getsize(inode_intf bs, uint ino) {
+    return FILE_SYS_DISK_SIZE / BLOCK_SIZE;
+}
 
-int getsize() { return FS_DISK_SIZE / BLOCK_SIZE; }
+int setsize(inode_intf bs, uint ino, uint newsize) {
+    assert(0);
+}
 
-int setsize() { assert(0); }
-
-int ramread(inode_intf bs, unsigned int ino, block_no offset, block_t *block) {
+int ramread(inode_intf bs, uint ino, uint offset, block_t* block) {
     memcpy(block, fs + offset * BLOCK_SIZE, BLOCK_SIZE);
     return 0;
 }
 
-int ramwrite(inode_intf bs, unsigned int ino, block_no offset, block_t *block) {
+int ramwrite(inode_intf bs, uint ino, uint offset, block_t* block) {
     memcpy(fs + offset * BLOCK_SIZE, block, BLOCK_SIZE);
     return 0;
 }
 
-inode_intf ramdisk_init() {
-    inode_store_t *ramdisk = malloc(sizeof(*ramdisk));
+int main() {
+    /* Write the kernel and system server binaries into exec[]. */
+    printf("[INFO] Load %ld kernel binary files\n", EGOS_BIN_NUM);
+    for (uint i = 0; i < EGOS_BIN_NUM; i++) {
+        int sz = load_file(egos_binaries[i], exec + i * EGOS_BIN_MAX_NBYTE);
+        printf("[INFO] Load %s: %d bytes\n", egos_binaries[i], sz);
+    }
 
-    ramdisk->read = (void*)ramread;
-    ramdisk->write = (void*)ramwrite;
-    ramdisk->getsize = (void*)getsize;
-    ramdisk->setsize = (void*)setsize;
+    /* Initialize the file system using the fs[] buffer as a ramdisk. */
+    printf("MKFS is using *%s*\n", FILESYS == 0 ? "mydisk" : "treedisk");
+    struct inode_store ramdisk = (struct inode_store){.read    = ramread,
+                                                      .write   = ramwrite,
+                                                      .getsize = getsize,
+                                                      .setsize = setsize};
+    (FILESYS == 0) ? assert(mydisk_create(&ramdisk, 0, NINODES) >= 0)
+                   : assert(treedisk_create(&ramdisk, 0, NINODES) >= 0);
+    inode_intf filesys =
+        (FILESYS == 0) ? mydisk_init(&ramdisk, 0) : treedisk_init(&ramdisk, 0);
 
-    return ramdisk;
+    /* Write to inode 0..BIN_DIR_INODE-1 in the file system. */
+    for (uint ino = 0; ino < BIN_DIR_INODE; ino++) {
+        printf("[INFO] Load ino=%d, %ld bytes\n", ino, strlen(contents[ino]));
+        strncpy(inode, contents[ino], BLOCK_SIZE);
+        filesys->write(filesys, ino, 0, (void*)inode);
+    }
+
+    /* Write to one inode for each user application. */
+    uint app_ino = BIN_DIR_INODE + 1;
+    DIR* dp      = opendir("../build/release/user");
+    assert(dp != NULL);
+    for (struct dirent* ep = readdir(dp); ep != NULL; ep = readdir(dp)) {
+        if (strstr(ep->d_name, ".elf")) {
+            sprintf(tmp, "../build/release/user/%s", ep->d_name);
+            int file_size = load_file(tmp, inode);
+            printf("[INFO] Load ino=%d, %s: %d bytes\n", app_ino, ep->d_name,
+                   file_size);
+
+            /* Write the ELF format application binary into inode app_ino. */
+            for (uint b = 0; b * BLOCK_SIZE < file_size; b++)
+                filesys->write(filesys, app_ino, b,
+                               (void*)(inode + b * BLOCK_SIZE));
+
+            /* Add the corresponding file entry into the /bin directory. */
+            ep->d_name[strlen(ep->d_name) - 4] = 0;
+            sprintf(tmp, "%s%4d ", ep->d_name, app_ino++);
+            strcat(bin_dir, tmp);
+        }
+    }
+    closedir(dp);
+    filesys->write(filesys, BIN_DIR_INODE, 0, (void*)bin_dir);
+    printf("[INFO] Load ino=%ld, %s\n", BIN_DIR_INODE, bin_dir);
+
+    /* Generate the disk image file. */
+    int fd  = open("disk.img", O_CREAT | O_WRONLY, 0666);
+    int sz1 = write(fd, exec, SIZE_2MB);
+    sz1 += write(fd, fs, SIZE_2MB);
+    close(fd);
+
+    /* Generate the QEMU ROM image file. */
+    fd      = open("qemuROM.bin", O_CREAT | O_WRONLY, 0666);
+    int sz2 = write(fd, exec, SIZE_2MB);
+    for (uint i = 0; i < 15; i++) sz2 += write(fd, fs, SIZE_2MB);
+    /* Simply pad the image to 32MB which is required by QEMU. */
+    close(fd);
+
+    assert(sz1 == SIZE_2MB * 2 && sz2 == SIZE_2MB * 16);
+    printf("[INFO] Finish making the image files\n");
+    return 0;
 }
-

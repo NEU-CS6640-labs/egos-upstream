@@ -1,119 +1,54 @@
 /*
- * (C) 2022, Cornell University
+ * (C) 2026, Cornell University
  * All rights reserved.
- */
-
-/* Author: Yunhao Zhang
- * Description: memory management unit (MMU)
  *
- * updated by CS6640 23fall staff
+ * Description: wrapping the CPU interface for memory management unit (MMU)
+ *
+ * Updated by CS6640 26spring staff.
  */
 
 #include "egos.h"
 #include <string.h>
 
 /* Interface to allocate/free a physical page */
-void* pmalloc(int clear);
-void  pfree(void *paddr);
-void *pageid2paddr(int pageid);
+void *pmalloc(int clear);
+void pfree(void *paddr);
+uint paddr_to_pgid(void *paddr); // FIXME: remove this later
 
-typedef struct {
-    void *private_addr;
-    void *exec_addr;
-} page_mapping;
-
-// number of pages of an app
-#define APPS_NPAGES (APPS_SIZE/PAGE_SIZE + 2)
-page_mapping app_pages[MAX_NPROCESS][APPS_NPAGES];
-
-void* mmu_alloc() {
-    return  pmalloc(1);
+// FIXME: return physical addr
+uint mmu_alloc() {
+    void *paddr = pmalloc(1);
+    return paddr_to_pgid(paddr); // FIXME
 }
 
-int soft_tlb_free(int pid) {
-    ASSERT(pid > 0 && pid<MAX_NPROCESS, "soft_tlb_free: pid is unexpected");
-    page_mapping *pages = app_pages[pid];
-    for (int i = 0; i < APPS_NPAGES; i++) {
-        if (pages[i].private_addr != NULL) {
-            pfree(pages[i].private_addr);
-            pages[i].private_addr = NULL;
-            pages[i].exec_addr = NULL;
-        }
+void flush_cache() {
+    /* QEMU doesn't need L1 instruction cache flush */
+    if (earth->translation == PAGE_TABLE) {
+        /* Flush the TLB, the cache for page table entries. */
+        /* See
+         * https://riscv.org/wp-content/uploads/2017/05/riscv-privileged-v1.10.pdf#subsection.4.2.1
+         */
+        asm("sfence.vma zero,zero");
     }
 }
 
-/* Software TLB Translation */
-int soft_tlb_map(int pid, void *dst, void *src) {
-    ASSERT(pid > 0 && pid<MAX_NPROCESS, "soft_tlb_map: pid is unexpected");
-    ASSERT( ((unsigned int)src % PAGE_SIZE == 0) && \
-            ((unsigned int)dst % PAGE_SIZE == 0), \
-            "soft_tlb_map: mapping address is not page aligned");
+/* defined in mem_soft_tlb.c */
+void soft_tlb_free(int pid);
+void soft_tlb_map(int pid, uint vpage_no, uint pgid);
+void soft_tlb_switch(int pid);
+uint soft_tlb_translate(int pid, uint vaddr);
 
-    page_mapping *pages = app_pages[pid];
-    for (int i = 0; i < APPS_NPAGES; i++) {
-        if (pages[i].private_addr == NULL) {
-            pages[i].private_addr = src;
-            pages[i].exec_addr = dst;
-            return 0;
-        }
-    }
-
-    FATAL("soft_tlb_map: mapping more pages than expected");
-}
-
-// a helper function to copy memory
-void memcopy_helper(int pid, int private2exec) {
-    ASSERT(pid > 0 && pid<MAX_NPROCESS, "memcopy_helper: pid is unexpected");
-
-    page_mapping *pages = app_pages[pid];
-    for (int i = 0; i < APPS_NPAGES; i++) {
-        if (pages[i].private_addr != NULL) {
-            ASSERT(pages[i].exec_addr != NULL, "");
-
-            void *src = (private2exec) ? \
-                        pages[i].private_addr : pages[i].exec_addr;
-            void *dst = (private2exec) ? \
-                        pages[i].exec_addr : pages[i].private_addr;
-
-            memcpy(dst, src, PAGE_SIZE);
-        }
-    }
-}
-
-int soft_tlb_switch(int pid) {
-    static int curr_vm_pid = -1;
-    if (pid == curr_vm_pid) return 0;
-
-    /* for curr_vm_pid,
-     * copy from exec memory back to the private pages*/
-    if (curr_vm_pid > 0) {
-        memcopy_helper(curr_vm_pid, 0 /*private2exec? no*/);
-    }
-
-    /* for pid (new running process),
-     * copy from private pages to exec addresses */
-    memcopy_helper(pid, 1 /*private2exec? yes*/);
-
-    curr_vm_pid = pid;
-}
-
-void pmp_init() {
-}
-
-/* defined in cpu_vm.c */
+/* defined in mem_vm.c */
+void pmp_init();
 void vm_init();
 
-/* MMU Initialization */
 void mmu_init() {
-    /* Initialize MMU interface functions */
-    earth->mmu_alloc = mmu_alloc;
-    earth->mmu_free = soft_tlb_free;
-    earth->mmu_map = soft_tlb_map;
-    earth->mmu_switch = soft_tlb_switch;
+    earth->mmu_alloc       = mmu_alloc;
+    earth->mmu_flush_cache = flush_cache;
 
-    /* Initialize memory protection */
-    pmp_init();
-
-    /* Initialize virtual memory */
-    vm_init();
+    earth->translation   = SOFT_TLB;
+    earth->mmu_free      = soft_tlb_free;
+    earth->mmu_map       = soft_tlb_map;
+    earth->mmu_switch    = soft_tlb_switch;
+    earth->mmu_translate = soft_tlb_translate;
 }

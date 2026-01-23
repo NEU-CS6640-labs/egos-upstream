@@ -1,49 +1,36 @@
 /*
- * (C) 2022, Cornell University
+ * (C) 2026, Cornell University
  * All rights reserved.
- */
-
-/* Author: Yunhao Zhang
- * Description: a simple disk device driver
  *
- * updated by CS6640 23fall staff
+ * Description: a simple disk device driver
  */
 
 #include "egos.h"
 #include "disk.h"
-#include "bus_gpio.c"
 #include <string.h>
 
-enum {
-      FLASH_ROM
-};
-static int type;
+static enum disk_type { SD_CARD, FLASH_ROM } type;
 
-int disk_read(int block_no, int nblocks, char* dst) {
+void disk_read(uint block_no, uint nblocks, char* dst) {
     if (type == FLASH_ROM) {
-        char* src = (char*)0x20800000 + block_no * BLOCK_SIZE;
+        char* src = (char*)FLASH_ROM_BASE + block_no * BLOCK_SIZE;
         memcpy(dst, src, nblocks * BLOCK_SIZE);
+        return;
     } else {
-        ASSERT(0, "disk type is unknown");
+        FATAL("UNKNOWN disk type.");
     }
-    return 0;
 }
 
-int disk_write(int block_no, int nblocks, char* src) {
+void disk_write(uint block_no, uint nblocks, char* src) {
     if (type == FLASH_ROM) {
-        FATAL("Attempt to write the on-board ROM");
+        FATAL("FLASH_ROM is read only");
     } else {
-        ASSERT(0, "write to disk type unknown");
+        FATAL("UNKNOWN disk type.");
     }
-    return 0;
 }
 
 void disk_init() {
-    earth->disk_read = disk_read;
-    earth->disk_write = disk_write;
-
-    /* QEMU only uses the on-board ROM as disk; */
-    // FIXME: add disk
     type = FLASH_ROM;
-    return;
+    earth->disk_read  = disk_read;
+    earth->disk_write = disk_write;
 }

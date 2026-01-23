@@ -1,45 +1,51 @@
 OUTPUT_ARCH("riscv")
 
-ENTRY(_enter)
+ENTRY(boot_loader)
 
 MEMORY
 {
-    ram (arw!xi) : ORIGIN = 0x08100000, LENGTH = 0x100000
+    code (rx) : ORIGIN = 0x80000000, LENGTH = 0x8000
+    data (rw) : ORIGIN = 0x80008000, LENGTH = 0xF8000
 }
 
 PHDRS
 {
-    ram PT_LOAD;
+    code PT_LOAD;
+    data PT_LOAD;
 }
 
 SECTIONS
 {
+    .init : ALIGN(8) {
+        *(.text.enter)
+    } >code :code
+
     .text : ALIGN(8) {
         *(.text .text.*)
-    } >ram :ram
+    } >code :code
 
     .rodata : ALIGN(8) {
         *(.rdata)
         *(.rodata .rodata.*)
         . = ALIGN(8);
         *(.srodata .srodata.*)
-    } >ram :ram
+    } >data :data
 
     .data : ALIGN(8) {
         *(.data .data.*)
         . = ALIGN(8);
         *(.sdata .sdata.* .sdata2.*)
-    } >ram :ram
+    } >data :data
 
     .bss (NOLOAD): ALIGN(8) {
         *(.sbss*)
         *(.bss .bss.*)
         *(COMMON)
-    } >ram :ram
+    } >data :data
 
     .heap (NOLOAD) : ALIGN(8) {
-          PROVIDE( __heap_start = . );
-    } >ram :ram
-    PROVIDE( __heap_end = 0x08200000 );
+        PROVIDE( __heap_start = . );
+    } >data :data
 
+    PROVIDE( __heap_end = 0x80100000 );
 }

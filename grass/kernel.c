@@ -1,0 +1,87 @@
+/*
+ * (C) 2026, Cornell University
+ * All rights reserved.
+ *
+ * Description: kernel ≈ 3 handlers
+ *   interrupt handler
+ *   exception handler
+ *   syscall
+ */
+
+#include "process.h"
+#include <string.h>
+
+uint core_in_kernel;
+uint core_to_proc_idx[NCORES];
+struct process proc_set[MAX_NPROCESS + 1];
+/* proc_set[0] is a place holder for idle cores. */
+
+static void intr_entry(uint);
+static void excp_entry(uint);
+
+void kernel_entry() {
+    /* With the kernel lock, only one core can enter this point at any time. */
+    asm("csrr %0, mhartid" : "=r"(core_in_kernel));
+
+    /* Save the process context. */
+    asm("csrr %0, mepc" : "=r"(proc_set[curr_proc_idx].mepc));
+    memcpy(curr_saved, (void*)(EGOS_STACK_TOP - 32 * 4), 32 * 4);
+
+    uint mcause;
+    asm("csrr %0, mcause" : "=r"(mcause));
+    if (mcause & (1 << 31)) {
+        intr_entry(mcause & 0x3FF);
+    } else {
+        excp_entry(mcause);
+    }
+
+    /* Restore the process context. */
+    asm("csrw mepc, %0" ::"r"(proc_set[curr_proc_idx].mepc));
+    memcpy((void*)(EGOS_STACK_TOP - 32 * 4), curr_saved, 32 * 4);
+}
+
+#define INTR_ID_SOFT_M  3
+#define INTR_ID_TIMER   7
+#define EXCP_ID_ECALL_U 8
+#define EXCP_ID_ECALL_M 11
+
+static void excp_entry(uint id) {
+    FATAL("excp_entry: kernel got exception %d", id);
+}
+
+static void intr_entry(uint id) {
+    if (id == INTR_ID_TIMER) {
+        /* user process killed by ctrl+c */
+        char c;
+        if (curr_pid >= GPID_USER_START &&
+            !earth->tty_input_empty() &&
+            (earth->tty_read(&c), c == 0x03) )
+        {
+            INFO("process %d killed by interrupt", curr_pid);
+            proc_set[curr_proc_idx].mepc = (uint) (APPS_ENTRY + 0xC);
+            return;
+        }
+        proc_yield();
+    } else if (id == INTR_ID_SOFT_M) {
+        /* clear the soft interrupt */
+        uint hartid;
+        asm("csrr %0, mhartid" : "=r"(hartid));
+        *(volatile uint *)CLINT_MSIP(hartid) = 0;
+
+        /* Copy the system call arguments from user space to the kernel. */
+        uint syscall_paddr = earth->mmu_translate(curr_pid, SYSCALL_ARG);
+        memcpy(&proc_set[curr_proc_idx].syscall,
+               (void*)syscall_paddr,
+               sizeof(struct syscall));
+        proc_set[curr_proc_idx].syscall.status = PENDING;
+
+        proc_set_pending(curr_pid);
+        proc_set[curr_proc_idx].mepc += 4;
+        proc_try_syscall(&proc_set[curr_proc_idx]);
+        proc_yield();
+        return;
+    } else {
+        FATAL("intr_entry: kernel got interrupt %d", id);
+    }
+}
+

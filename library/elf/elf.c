@@ -1,115 +1,81 @@
 /*
- * (C) 2022, Cornell University
+ * (C) 2026, Cornell University
  * All rights reserved.
- */
-
-/* Author: Yunhao Zhang
- * Description: load an ELF-format executable file into memory
- * Only use the program header instead of the multiple section headers.
+ *
+ * Description: ELF-format executable file loader
  */
 
 #include "egos.h"
 #include "elf.h"
 #include "disk.h"
 #include "servers.h"
-
 #include <string.h>
 
-static void load_grass(elf_reader reader,
-                       struct elf32_program_header* pheader) {
-    INFO("Grass kernel file size: 0x%.8x bytes", pheader->p_filesz);
-    INFO("Grass kernel memory size: 0x%.8x bytes", pheader->p_memsz);
+#define PAGE_SIZE          4096
+#define PAGE_ID_TO_ADDR(x) ((char*)APPS_PAGES_BASE + x * PAGE_SIZE)
 
-    char* entry = (char*)GRASS_ENTRY;
-    int block_offset = pheader->p_offset / BLOCK_SIZE;
-    for (int off = 0; off < pheader->p_filesz; off += BLOCK_SIZE)
-        reader(block_offset++, entry + off);
+void elf_load(int pid, elf_reader reader, int argc, void** argv) {
+    /* Load the ELF header. */
+    char hbuf[BLOCK_SIZE], buf[BLOCK_SIZE];
+    reader(0, hbuf);
+    struct elf32_header* header          = (void*)hbuf;
+    struct elf32_program_header* pheader = (void*)(hbuf + header->e_phoff);
 
-    memset(entry + pheader->p_filesz, 0, GRASS_SIZE - pheader->p_filesz);
-}
+    /* Load the code and data memory regions. */
+    for (uint i = 0; i < header->e_phnum; i++) {
+        uint addr = pheader[i].p_vaddr;
+        if (addr < RAM_START) continue;
 
-static void load_app(int pid, elf_reader reader,
-                     int argc, void** argv,
-                     struct elf32_program_header* pheader) {
-
-    /* Debug printing during bootup */
-    if (pid < GPID_USER_START) {
-        INFO("App file size: 0x%.8x bytes", pheader->p_filesz);
-        INFO("App memory size: 0x%.8x bytes", pheader->p_memsz);
-    }
-
-    /* load app segment into planned memory:
-     *  (1) allocate memory for app's code+data
-     *      [APPS_ENTRY, APPS_ENTRY+APPS_SZIE]
-     *  (2) copy code to the allocated memory
-     *  (3) allocate stack and arg pages
-     * */
-
-    // (1) allocate memory
-    int app_npages = APPS_SIZE / PAGE_SIZE;
-    void *paddrs[app_npages];
-
-    for (int i = 0; i < app_npages; i++) {
-        paddrs[i] = earth->mmu_alloc();
-        memset((char*)paddrs[i], 0, PAGE_SIZE);
-
-        // map allocated page to app's corresponding address
-        earth->mmu_map(pid, (void *) (APPS_ENTRY + i * PAGE_SIZE), paddrs[i]);
-    }
-
-    // (2) copy app from elf to the allocated memory
-    int page_idx = -1;
-    int block_offset = pheader->p_offset / BLOCK_SIZE;
-    for (int off = 0; off < pheader->p_filesz; off += BLOCK_SIZE) {
-        if (off % PAGE_SIZE == 0) {
-            page_idx++;  // first time: page_idx == 0
-            ASSERT( ((page_idx>=0) && (page_idx<app_npages)), "app is larger than APPS_SIZE");
+        uint memsz        = pheader[i].p_memsz;
+        uint filesz       = pheader[i].p_filesz;
+        uint curr_pageno  = addr / PAGE_SIZE;
+        uint end_pageno   = (addr + memsz) / PAGE_SIZE;
+        uint curr_blockno = pheader[i].p_offset / BLOCK_SIZE;
+        for (uint ppage_id, off = 0; off < filesz; off += BLOCK_SIZE) {
+            /* Allocate one page (4KB) for every 8 blocks (512 bytes). */
+            if (off % PAGE_SIZE == 0) {
+                ppage_id = earth->mmu_alloc();
+                earth->mmu_map(pid, curr_pageno++, ppage_id);
+                memset(PAGE_ID_TO_ADDR(ppage_id), 0, PAGE_SIZE);
+            }
+            uint size =
+                (off + BLOCK_SIZE < filesz) ? BLOCK_SIZE : (filesz - off);
+            reader(curr_blockno++, buf);
+            memcpy(PAGE_ID_TO_ADDR(ppage_id) + (off % PAGE_SIZE), buf, size);
         }
-        reader(block_offset++, (char*)paddrs[page_idx] + (off % PAGE_SIZE));
+
+        while (curr_pageno < end_pageno) {
+            uint ppage_id = earth->mmu_alloc();
+            earth->mmu_map(pid, curr_pageno++, ppage_id);
+            memset(PAGE_ID_TO_ADDR(ppage_id), 0, PAGE_SIZE);
+        }
+
+        /* Numbers printed should match the numbers in build/debug/sys_*.lst. */
+        if (pid <= GPID_SHELL) INFO("Load 0x%x bytes to 0x%x", filesz, addr);
     }
 
-    // clean the unfilled memory on the last page
-    int last_page_filled = pheader->p_filesz % PAGE_SIZE;
-    int last_page_nzeros = PAGE_SIZE - last_page_filled;
-    if (last_page_filled) {
-        memset((char*)paddrs[page_idx] + last_page_filled, 0, last_page_nzeros);
-    }
+    /* Setup a page for main() arguments (argc and argv). */
+    uint ppage_id = earth->mmu_alloc();
+    earth->mmu_map(pid, APPS_ARG / PAGE_SIZE, ppage_id);
 
-
-    /* (3) Setup two pages for app args, syscall args, and app stack:
-     *       [APPS_ARG, APPS_STACK_TOP)
-     * */
-    void *paddr = earth->mmu_alloc();
-    earth->mmu_map(pid, (void *)APPS_ARG, paddr);
-
-    int* argc_addr = (int *)paddr;
+    int* argc_addr = (int*)PAGE_ID_TO_ADDR(ppage_id);
     int* argv_addr = argc_addr + 1;
     int* args_addr = argv_addr + CMD_NARGS;
 
+    /* Initialize argc and argv. */
     *argc_addr = argc;
     if (argv) memcpy(args_addr, argv, argc * CMD_ARG_LEN);
-    for (int i = 0; i < argc; i++)
-        argv_addr[i] = APPS_ARG + 4 + 4 * CMD_NARGS + i * CMD_ARG_LEN;
+    for (uint i = 0; i < argc; i++)
+        argv_addr[i] = APPS_ARG + sizeof(uint) /* argc */ +
+                       sizeof(void*) * CMD_NARGS /* argv */ + i * CMD_ARG_LEN;
 
-    paddr = earth->mmu_alloc();
-    earth->mmu_map(pid, (void*)(APPS_ARG + PAGE_SIZE), paddr);
+    /* Setup a page for system call arguments. */
+    ppage_id = earth->mmu_alloc();
+    earth->mmu_map(pid, SYSCALL_ARG / PAGE_SIZE, ppage_id);
+
+    /* Setup 2 pages for user stack (enough for teaching purpose). */
+    for (uint i = 1; i <= 2; i++) {
+        ppage_id = earth->mmu_alloc();
+        earth->mmu_map(pid, APPS_STACK_TOP / PAGE_SIZE - i, ppage_id);
+    }
 }
-
-void elf_load(int pid, elf_reader reader, int argc, void** argv) {
-    char buf[BLOCK_SIZE];
-    reader(0, buf);
-
-    struct elf32_header *header = (void*) buf;
-    ASSERT(header->e_phnum == 1, "has more than one program header");
-
-    struct elf32_program_header *pheader = (void*)(buf + header->e_phoff);
-
-    if (pheader->p_vaddr == GRASS_ENTRY)
-        load_grass(reader, pheader);
-    else if (pheader->p_vaddr == APPS_ENTRY)
-        load_app(pid, reader, argc, argv, pheader);
-    else
-        FATAL("elf_load: ELF gives invalid p_vaddr: 0x%.8x", pheader->p_vaddr);
-}
-
-
