@@ -30,16 +30,40 @@ void format_to_str(char* out, const char* fmt, va_list args) {
                 size_t len = strlen(out);
                 out[len] = '%';
                 out[len+1] = '\0';
+            } else if (*fmt == 'f') {
+                double v = va_arg(args, double);
+
+                /* handle sign */
+                if (v < 0) {
+                    size_t len = strlen(out);
+                    out[len] = '-';
+                    out[len + 1] = '\0';
+                    v = -v;
+                }
+
+                /* scale and round to two decimals */
+                unsigned long long scaled = (unsigned long long)(v * 100.0 + 0.5);
+                unsigned long long ipart  = scaled / 100;
+                unsigned long long fpart  = scaled % 100;
+                /* integer part */
+                itoa((int)ipart, out + strlen(out), 10);
+                /* decimal point */
+                strcat(out, ".");
+                /* fractional part: always two digits */
+                size_t len = strlen(out);
+                out[len]     = '0' + (fpart / 10);
+                out[len + 1] = '0' + (fpart % 10);
+                out[len + 2] = '\0';
             }
 
             /* [lab1-ex7]
              * TODO:
              * - handle format %c, %u, %p, %lld, %llu and %llx.
-             * - if you don't know, google the meaning of these formats
+             * - if you don't know, google the meaning of format like '%u'
              * Hints:
              *   - read '$ man va_arg' to understand how to fetch the arguments
              *   - for numbers, you can either implement something like `itoa`
-             *     or use other functions in standard C library
+             *     or using other functions in standard C library
              *     or search for utility functions like `itoa`
              * */
             else {

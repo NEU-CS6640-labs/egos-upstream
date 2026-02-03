@@ -8,7 +8,6 @@
 
 #define MTIME_BASE    (CLINT_BASE + 0xBFF8)
 #define MTIMECMP_BASE (CLINT_BASE + 0x4000)
-#define QUANTUM       100000UL
 
 ulonglong mtime_get() {
     uint low, high;
@@ -33,5 +32,6 @@ static void timer_reset(uint core_id) {
 void timer_init(uint core_id) {
     /* Initialize the timer. */
     earth->timer_reset = timer_reset;
+    earth->gettime = mtime_get;
     mtimecmp_set(0x0FFFFFFFFFFFFFFFUL, core_id);
 }

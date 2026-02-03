@@ -10,6 +10,7 @@ struct earth {
     void (*mmu_free)(int pid);
     void (*mmu_flush_cache)();
     void (*timer_reset)(uint core_id);
+    ulonglong (*gettime)();
 
     void (*mmu_map)(int pid, uint vpage_no, uint ppage_id);
     uint (*mmu_translate)(int pid, uint vaddr);
@@ -56,6 +57,9 @@ extern struct grass* grass;
 
 #define PAGE_SIZE          4096
 #define APPS_PAGES_CNT     ((RAM_END - APPS_PAGES_BASE) / PAGE_SIZE)
+
+/* ticks for each time slice */
+#define QUANTUM       100000UL
 
 /* Below is the memory-mapped I/O layout for QEMU virt machine. */
 #define SDHCI_PCI_ECAM     0x30008000UL

@@ -7,44 +7,60 @@
 
 #include "process.h"
 
-#define MLFQ_NLEVELS          5
-#define MLFQ_RESET_PERIOD     10000000         /* 10 seconds */
-#define MLFQ_LEVEL_RUNTIME(x) (x + 1) * 100000 /* e.g., 100ms for level 0 */
-
+/* process status management */
 static void proc_set_status(int pid, enum proc_status status) {
     for (uint i = 0; i < MAX_NPROCESS; i++)
         if (proc_set[i].pid == pid) proc_set[i].status = status;
 }
 
-void proc_set_ready(int pid) { proc_set_status(pid, PROC_READY); }
-void proc_set_running(int pid) { proc_set_status(pid, PROC_RUNNING); }
-void proc_set_runnable(int pid) { proc_set_status(pid, PROC_RUNNABLE); }
-void proc_set_pending(int pid) { proc_set_status(pid, PROC_PENDING_SYSCALL); }
+void proc_set_ready(int pid) {
+    proc_set_status(pid, PROC_READY);
+}
 
+void proc_set_running(int pid) {
+    proc_set_status(pid, PROC_RUNNING);
+}
+
+void proc_set_runnable(int pid) {
+    proc_set_status(pid, PROC_RUNNABLE);
+}
+
+void proc_set_pending(int pid) {
+    proc_set_status(pid, PROC_PENDING_SYSCALL);
+}
+
+
+/* helper functions */
+int pid2idx(int pid) {
+    ASSERT(pid > 0 && pid <= MAX_NPROCESS, "wrong pid");
+    return pid;
+}
+
+int idx2pid(int proc_idx) {
+    ASSERT(proc_idx > 0 && proc_idx <= MAX_NPROCESS, "wrong proc_idx");
+    return proc_idx;
+}
+
+
+/* process management */
 int proc_alloc() {
-    static uint cpid = 0;
-    for (uint i = 1; i <= MAX_NPROCESS; i++)
+    for (uint i = 1; i <= MAX_NPROCESS; i++) {
         if (proc_set[i].status == PROC_UNUSED) {
-            proc_set[i].pid    = ++cpid;
+            proc_set[i].pid    = i;
             proc_set[i].status = PROC_LOADING;
-            /* Student's code goes here (Preemptive Scheduler | System Call). */
-
-            /* Initialization of lifecycle statistics, MLFQ or process sleep. */
-
-            /* Student's code ends here. */
-            return cpid;
+            proc_on_arrive(proc_set[i].pid); // notify scheduler
+            return proc_set[i].pid;
         }
+    }
 
     FATAL("proc_alloc: reach the limit of %d processes", MAX_NPROCESS);
 }
 
 void proc_free(int pid) {
-    /* Student's code goes here (Preemptive Scheduler). */
-
-    /* Print the lifecycle statistics of the terminated process or processes. */
     if (pid != GPID_ALL) {
         earth->mmu_free(pid);
         proc_set_status(pid, PROC_UNUSED);
+        proc_on_stop(pid); // notify scheduler
     } else {
         /* Free all user processes. */
         for (uint i = 0; i < MAX_NPROCESS; i++)
@@ -52,33 +68,14 @@ void proc_free(int pid) {
                 proc_set[i].status != PROC_UNUSED) {
                 earth->mmu_free(proc_set[i].pid);
                 proc_set[i].status = PROC_UNUSED;
+                proc_on_stop(proc_set[i].pid); // notify scheduler
             }
     }
-    /* Student's code ends here. */
-}
-
-void mlfq_update_level(struct process* p, ulonglong runtime) {
-    /* Student's code goes here (Preemptive Scheduler). */
-
-    /* Update the MLFQ-related fields in struct process* p after this
-     * process has run on the CPU for another runtime microseconds. */
-
-    /* Student's code ends here. */
-}
-
-void mlfq_reset_level() {
-    /* Student's code goes here (Preemptive Scheduler). */
-    if (!earth->tty_input_empty()) {
-        /* Reset the level of GPID_SHELL if there is pending keyboard input. */
-    }
-
-    static ulonglong MLFQ_last_reset_time = 0;
-    /* Reset the level of all processes every MLFQ_RESET_PERIOD microseconds. */
-
-    /* Student's code ends here. */
 }
 
 void proc_sleep(int pid, uint usec) {
+    proc_on_sleep(pid, usec); // notify scheduler
+
     /* Student's code goes here (System Call & Protection). */
 
     /* Update the sleep-related fields in the struct process for process pid. */

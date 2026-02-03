@@ -4,6 +4,8 @@
 
 # [lab2]: compile with ult
 ENABLE_ULT ?= 1
+# [lab3]: TODO: change "NAIVE" to "MLFQ"
+SCHEDULER=NAIVE
 
 
 QEMU        = qemu-system-riscv32
@@ -47,7 +49,8 @@ egos: $(USRAPP_ELFS) $(SYSAPP_ELFS) $(ULT_ELF) $(RELEASE)/egos.elf
 
 $(RELEASE)/egos.elf: $(EGOS_DEPS)
 	@printf "$(YELLOW)-------- Compile EGOS --------$(END)\n"
-	$(RISCV_CC) $(CFLAGS) $(INCLUDE) -DKERNEL $(filter %.s, $(wildcard $^)) $(filter %.c, $(wildcard $^)) -Tlibrary/elf/egos.lds $(LDFLAGS) -o $@
+	$(RISCV_CC) $(CFLAGS) $(INCLUDE) -DKERNEL -D$(SCHEDULER) \
+		$(filter %.s, $(wildcard $^)) $(filter %.c, $(wildcard $^)) -Tlibrary/elf/egos.lds $(LDFLAGS) -o $@
 	@$(OBJDUMP) $(DEBUG_FLAGS) $@ > $(DEBUG)/egos.lst
 
 $(SYSAPP_ELFS): $(RELEASE)/%.elf : apps/system/%.c $(APPS_DEPS)
@@ -72,7 +75,7 @@ install: egos
 	$(CC) tools/mkfs.c library/file/file$(FILESYS).c -DMKFS -DFILESYS=$(FILESYS) $(INCLUDE) -o tools/mkfs
 	cd tools; rm -f disk.img qemuROM.bin; ./mkfs
 
-QEMU_MACHINE = -M virt -smp 4 -m 8M -bios tools/egos.bin
+QEMU_MACHINE = -M virt -smp 1 -m 8M -bios tools/egos.bin
 QEMU_GRAPHIC = -nographic# -device VGA,addr=0x2 -serial mon:stdio
 QEMU_FLASH_1 = -drive if=pflash,format=raw,unit=1,file=tools/qemuROM.bin
 QEMU_ETH_NET = -device e1000,netdev=E1000,addr=0x3 -netdev socket,id=E1000,listen=:1234
