@@ -59,7 +59,7 @@ extern struct grass* grass;
 #define APPS_PAGES_CNT     ((RAM_END - APPS_PAGES_BASE) / PAGE_SIZE)
 
 /* ticks for each time slice */
-#define QUANTUM       100000UL
+#define QUANTUM       1000000UL
 
 /* Below is the memory-mapped I/O layout for QEMU virt machine. */
 #define SDHCI_PCI_ECAM     0x30008000UL

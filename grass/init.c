@@ -1,47 +1,55 @@
 /*
- * (C) 2026, Cornell University
- * All rights reserved.
- *
- * Description: grass layer initialization
- * Spawn the first process, GPID_PROCESS (pid=1).
+ * Description: a simple timer example
  */
 
-#include "process.h"
-#include "elf.h"
+#include "egos.h"
 
-static void sys_proc_read(uint block_no, char* dst) {
-    earth->disk_read(SYS_PROC_EXEC_START + block_no, 1, dst);
+#define CLINT0_MTIME     0x200bff8
+#define CLINT0_MTIMECMP  0x2004000
+
+long long local_mtime_get() {
+    int low  = *(int*)(CLINT0_MTIME);
+    int high = *(int*)(CLINT0_MTIME + 4);
+    return (((long long)high) << 32) | low;
 }
 
-void grass_entry(uint core_id) {
-    SUCCESS("Enter the grass layer");
+void mtimecmp_set(long long time) {
+    *(int*)(CLINT0_MTIMECMP + 0) = (int)time;
+    *(int*)(CLINT0_MTIMECMP + 4) = (int)(time >> 32);
+}
 
-    /* Initialize the grass interface. */
-    grass->proc_free      = proc_free;
-    grass->proc_alloc     = proc_alloc;
-    grass->proc_set_ready = proc_set_ready;
-    grass->sys_send       = sys_send;
-    grass->sys_recv       = sys_recv;
+void handler() {
+    static long long last_time = 0;
+    CRITICAL("Got a timer interrupt!");
 
-    /* Load GPID_PROCESS. */
-    INFO("Load kernel process #%d: sys_process", GPID_PROCESS);
-    elf_load(GPID_PROCESS, sys_proc_read, 0, 0);
-    proc_set_running(proc_alloc());
-    core_to_proc_idx[core_id] = 1; /* See proc_alloc() for why. */
-    earth->mmu_switch(GPID_PROCESS);
-    earth->mmu_flush_cache();
+    if (local_mtime_get() < last_time) {
+        printf("last time: 0x%llx, this time: 0x%llx\n",
+                last_time, local_mtime_get());
+        FATAL("timer overflow");
+    }
+    last_time = local_mtime_get();
 
-    /* Jump to the first instruction of process GPID_PROCESS. */
-    uint mstatus, M_MODE = 3, U_MODE = 0;
-    uint GRASS_MODE = (earth->translation == SOFT_TLB) ? M_MODE : U_MODE;
+    // (4) reset timer
+    mtimecmp_set(local_mtime_get() + QUANTUM);
+}
+
+
+int grass_entry() {
+    CRITICAL("This is a simple timer example");
+
+    // (1) register handler() as interrupt handler
+    asm("csrw mtvec, %0" ::"r"(handler));
+
+    // (2) Set a timer
+    mtimecmp_set(local_mtime_get() + QUANTUM);
+
+    // (3) enable timer interrupt
+    int mstatus, mie;
     asm("csrr %0, mstatus" : "=r"(mstatus));
-    mstatus = (mstatus & ~(3 << 11)) | (GRASS_MODE << 11);
-    asm("csrw mstatus, %0" ::"r"(mstatus));
+    asm("csrw mstatus, %0" ::"r"(mstatus | 0x8));
+    asm("csrr %0, mie" : "=r"(mie));
+    asm("csrw mie, %0" ::"r"(mie | 0x80));
 
-    asm("csrw mepc, %0" ::"r"(APPS_ENTRY));
-    asm("mv a0, %0" ::"r"(APPS_ARG));
-    asm("mv a1, %0" ::"r"(&boot_lock));
-    asm("mret");
-    /* If using page table translation, the CPU will enter the user mode after
-     * this mret and thus page table translation will start to take effect. */
+
+    while(1);
 }
