@@ -105,7 +105,7 @@ void proc_yield() {
  *     for the first time.
  *   - Notice that pid=1 is different from others.
  *     When pid=1 arrives (see grass/init.c and process.c:proc_alloc()),
- *     it will be direclty scheduled by grass layer, not via scheduler.c:schedule().
+ *     it will be directly scheduled by grass layer, not via scheduler.c:schedule().
  * */
 
 /* --------------------------------------
