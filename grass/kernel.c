@@ -76,7 +76,6 @@ static void intr_entry(uint id) {
         proc_set[curr_proc_idx].syscall.status = PENDING;
 
         proc_set_pending(curr_pid);
-        proc_set[curr_proc_idx].mepc += 4;
         proc_try_syscall(&proc_set[curr_proc_idx]);
         proc_yield();
         return;
