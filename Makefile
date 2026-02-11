@@ -6,7 +6,8 @@
 ENABLE_ULT ?= 1
 # [lab3]: TODO: change "NAIVE" to "MLFQ"
 SCHEDULER=NAIVE
-
+# [lab4]: TODO: change "SOFTINT" to "ECALL"
+SYSCALLFUNC=SOFTINT
 
 QEMU        = qemu-system-riscv32
 
@@ -49,24 +50,24 @@ egos: $(USRAPP_ELFS) $(SYSAPP_ELFS) $(ULT_ELF) $(RELEASE)/egos.elf
 
 $(RELEASE)/egos.elf: $(EGOS_DEPS)
 	@printf "$(YELLOW)-------- Compile EGOS --------$(END)\n"
-	$(RISCV_CC) $(CFLAGS) $(INCLUDE) -DKERNEL -D$(SCHEDULER) \
+	$(RISCV_CC) $(CFLAGS) $(INCLUDE) -DKERNEL -D$(SCHEDULER) -D$(SYSCALLFUNC)\
 		$(filter %.s, $(wildcard $^)) $(filter %.c, $(wildcard $^)) -Tlibrary/elf/egos.lds $(LDFLAGS) -o $@
 	@$(OBJDUMP) $(DEBUG_FLAGS) $@ > $(DEBUG)/egos.lst
 
 $(SYSAPP_ELFS): $(RELEASE)/%.elf : apps/system/%.c $(APPS_DEPS)
 	@printf "Compile app $(CYAN)%s$(END) => %s\n" $(patsubst %.c, %, $(notdir $<)) $@
-	@$(RISCV_CC) $(CFLAGS) $(INCLUDE) -DFILESYS=$(FILESYS) -DKERNEL -Iapps apps/app.s $(filter %.c, $(wildcard $^)) -Tlibrary/elf/app.lds $(LDFLAGS) -o $@
+	@$(RISCV_CC) $(CFLAGS) $(INCLUDE) -DFILESYS=$(FILESYS) -DKERNEL -D$(SYSCALLFUNC) -Iapps apps/app.s $(filter %.c, $(wildcard $^)) -Tlibrary/elf/app.lds $(LDFLAGS) -o $@
 	@$(OBJDUMP) $(DEBUG_FLAGS) $@ > $(patsubst %.c, $(DEBUG)/%.lst, $(notdir $<))
 
 $(USRAPP_ELFS): $(RELEASE)/user/%.elf : apps/user/%.c $(APPS_DEPS)
 	@mkdir -p $(DEBUG) $(RELEASE) $(RELEASE)/user
 	@printf "Compile app $(CYAN)%s$(END) => %s\n" $(patsubst %.c, %, $(notdir $<)) $@
-	@$(RISCV_CC) $(CFLAGS) $(INCLUDE) -Iapps apps/app.s $(filter %.c, $(wildcard $^)) -Tlibrary/elf/app.lds $(LDFLAGS) -o $@
+	@$(RISCV_CC) $(CFLAGS) $(INCLUDE) -D$(SYSCALLFUNC) -Iapps apps/app.s $(filter %.c, $(wildcard $^)) -Tlibrary/elf/app.lds $(LDFLAGS) -o $@
 	@$(OBJDUMP) $(DEBUG_FLAGS) $@ > $(patsubst %.c, $(DEBUG)/%.lst, $(notdir $<))
 
 $(RELEASE)/user/ult.elf: apps/user/ult.c apps/user/ult_test.c apps/user/thread.s $(APPS_DEPS)
 	@printf "Compile app $(CYAN)%s$(END) => %s\n" $(patsubst %.c, %, $(notdir $<)) $@
-	$(RISCV_CC) $(CFLAGS) $(INCLUDE) -Iapps apps/app.s apps/user/thread.s $(filter %.c, $(wildcard $^)) -Tlibrary/elf/app.lds $(LDFLAGS) -o $@
+	$(RISCV_CC) $(CFLAGS) $(INCLUDE) -D$(SYSCALLFUNC) -Iapps apps/app.s apps/user/thread.s $(filter %.c, $(wildcard $^)) -Tlibrary/elf/app.lds $(LDFLAGS) -o $@
 	@$(OBJDUMP) $(DEBUG_FLAGS) $@ > $(patsubst %.c, $(DEBUG)/%.lst, $(notdir $<))
 
 install: egos

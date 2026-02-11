@@ -19,10 +19,6 @@ void exit(int status) {
     while (1);
 }
 
-void sleep(uint usec) {
-    FATAL("Sleep is not implemented");
-}
-
 int dir_lookup(int dir_ino, char* name) {
     char buf[BLOCK_SIZE];
     file_read(dir_ino, 0, buf);

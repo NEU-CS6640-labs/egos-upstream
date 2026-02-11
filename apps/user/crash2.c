@@ -2,15 +2,13 @@
  * (C) 2026, Cornell University
  * All rights reserved.
  *
- * Description: a program trying to corrupt memory
- * Students are asked to modify the kernel so that this
- * program terminates gracefully without corrupting any memory.
+ * Description: a program that attempts to perform privileged operations
  */
 
 #include "app.h"
 #include "egos.h"
 
 int main() {
-    memset((void*)APPS_PAGES_BASE, 0, RAM_END - APPS_PAGES_BASE);
-    return 0;
+    asm("csrw mstatus, %0" ::"r"(0xdeadbeef));
+    SUCCESS("Crash2 succeeds in running a high-privileged instruction");
 }

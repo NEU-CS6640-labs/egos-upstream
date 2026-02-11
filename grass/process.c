@@ -68,19 +68,15 @@ void proc_free(int pid) {
                 proc_set[i].status != PROC_UNUSED) {
                 earth->mmu_free(proc_set[i].pid);
                 proc_set[i].status = PROC_UNUSED;
-                proc_on_stop(proc_set[i].pid); // notify scheduler
+                if (pid >= 0)
+                    proc_on_stop(proc_set[i].pid); // notify scheduler
             }
     }
 }
 
 void proc_sleep(int pid, uint usec) {
+    proc_set_status(pid, PROC_SLEEPING);
     proc_on_sleep(pid, usec); // notify scheduler
-
-    /* Student's code goes here (System Call & Protection). */
-
-    /* Update the sleep-related fields in the struct process for process pid. */
-
-    /* Student's code ends here. */
 }
 
 void proc_coresinfo() {

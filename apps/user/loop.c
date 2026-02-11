@@ -8,10 +8,24 @@
 #include "app.h"
 #include <stdlib.h>
 
-int main(int argc, char** argv) {
-    for (uint i = 0; argc == 1 ? 1 : (i < atoi(argv[1])); i++) {
-        for (uint j = 0; j < 1000000; j++);
-        if (argc != 1 && argc != 3) printf("loop #%d\n\r", i);
+void loop(int count) {
+    int counter = 0;
+    for(int i=0;i<count*QUANTUM; i++) {
+        float ret = (float)i / counter;
+        counter++;
     }
-    return 0;
+}
+
+void sleep(int time) {
+    sys_sleep(time);
+}
+
+int main(int argc, char** argv) {
+    if (argc == 1) {
+        loop(100);
+    } else if (strcmp(argv[1], "sleep") == 0) {
+        printf("Sleep for 5 QUANTUM...\n");
+        sleep(5);
+        printf("                   ...and waked up\n");
+    }
 }

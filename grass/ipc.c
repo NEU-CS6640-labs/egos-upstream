@@ -55,6 +55,19 @@ void proc_try_syscall(struct process* proc) {
     case SYS_SEND:
         proc_try_send(proc);
         break;
+    case SYS_SLEEP:
+        {
+        /* [lab4-ex1]
+         * - handling SYS_SLEEP by calling proc_sleep (in process.c)
+         * - set syscall status to DONE in **user space**
+         *   (How? check out code in the other two syscalls)
+         *   (Why? what if we don't? Try and think of why.)
+         */
+
+         /* TODO: your code here */
+
+        }
+        break;
     default:
         FATAL("proc_try_syscall: unknown syscall type=%d", proc->syscall.type);
     }

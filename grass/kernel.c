@@ -38,7 +38,17 @@ void kernel_entry() {
     /* Restore the process context. */
     asm("csrw mepc, %0" ::"r"(proc_set[curr_proc_idx].mepc));
     memcpy((void*)(EGOS_STACK_TOP - 32 * 4), curr_saved, 32 * 4);
-}
+
+    /* [lab4-ex4]
+     * when resuming an app, the kernel switches privilege level:
+     * it updates mstatus.MPP to select the target mode:
+     * - if curr_pid is a user application, switch to U-mode
+     * - if curr_pid is a system process, switch to M-mode
+     */
+
+    /* TODO: your code here */
+
+} // will return to grass/kernel.s, which finally calls `mret`
 
 #define INTR_ID_SOFT_M  3
 #define INTR_ID_TIMER   7
@@ -46,6 +56,20 @@ void kernel_entry() {
 #define EXCP_ID_ECALL_M 11
 
 static void excp_entry(uint id) {
+    /* [lab4-ex3]
+     * - If id is for syscalls, handle the system call and return:
+     *   -- you need to capture **all** ecall exceptions
+     *   -- you need to think of which pc the CPU will run after "mret";
+     *      in other word, you need to properly update PCBs so that
+     *      eventually "mepc" will be set to the right instruction.
+     *   -- How to invoke syscall? check out our old implementation using
+     *      software interrupt (in intr_entry() below)
+     * - Otherwise,
+     *   -- if curr_pid is a user application, kill the process
+     *   -- if curr_pid is a system proc, panic the kernel using FATAL
+     */
+
+    /* TODO: your code here */
     FATAL("excp_entry: kernel got exception %d", id);
 }
 
@@ -62,6 +86,7 @@ static void intr_entry(uint id) {
             return;
         }
         proc_yield();
+#ifndef ECALL
     } else if (id == INTR_ID_SOFT_M) {
         /* clear the soft interrupt */
         uint hartid;
@@ -76,10 +101,10 @@ static void intr_entry(uint id) {
         proc_set[curr_proc_idx].syscall.status = PENDING;
 
         proc_set_pending(curr_pid);
-        proc_set[curr_proc_idx].mepc += 4;
         proc_try_syscall(&proc_set[curr_proc_idx]);
         proc_yield();
         return;
+#endif
     } else {
         FATAL("intr_entry: kernel got interrupt %d", id);
     }

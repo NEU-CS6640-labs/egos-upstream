@@ -6,12 +6,8 @@
 #include "egos.h"
 #include "string.h"
 
-void pmp_init() {
-    // TODO
-}
-
 
 void vm_init() {
-    // TODO
+
 }
 

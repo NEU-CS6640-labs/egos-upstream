@@ -18,15 +18,35 @@ int schedule() {
     return next_idx;
 }
 
+#define rr_sleep_begin    schd_attr.longlongs[0]
+#define rr_sleep_quantums schd_attr.ints[15]
+
 int round_robin() {
     int next_idx = MAX_NPROCESS;
-    for (uint i = 1; i <= MAX_NPROCESS; i++) {
-        struct process* p = &proc_set[(curr_proc_idx + i) % MAX_NPROCESS];
-        if (p->status == PROC_READY || p->status == PROC_RUNNABLE) {
-            next_idx = (curr_proc_idx + i) % MAX_NPROCESS;
-            break;
+    int sleeping_exist = 0;
+    do {
+        sleeping_exist = 0;
+        for (uint i = 1; i <= MAX_NPROCESS; i++) {
+            struct process* p = &proc_set[(curr_proc_idx + i) % MAX_NPROCESS];
+
+            if (p->status == PROC_SLEEPING) { // wake up sleeping proc
+                int past_q = (earth->gettime() - p->rr_sleep_begin) / QUANTUM;
+                //printf("past_q = %d\n", past_q);
+                if (past_q >= p->rr_sleep_quantums) {
+                    p->status = PROC_RUNNABLE;
+                } else {
+                    sleeping_exist = 1;
+                }
+            }
+
+            if (p->status == PROC_READY || p->status == PROC_RUNNABLE) {
+                next_idx = (curr_proc_idx + i) % MAX_NPROCESS;
+                break;
+            }
         }
-    }
+    } while (next_idx == MAX_NPROCESS && sleeping_exist);
+    // if no next proc to run and exist sleeping process
+
     return next_idx;
 }
 
@@ -105,7 +125,7 @@ void proc_yield() {
  *     for the first time.
  *   - Notice that pid=1 is different from others.
  *     When pid=1 arrives (see grass/init.c and process.c:proc_alloc()),
- *     it will be directly scheduled by grass layer, not via scheduler.c:schedule().
+ *     it will be direclty scheduled by grass layer, not via scheduler.c:schedule().
  * */
 
 /* --------------------------------------
@@ -145,7 +165,21 @@ void proc_on_sched_out(int pid) {
 }
 
 void proc_on_sleep(int pid, int time_units) {
-    /* Callback invoked when a process transitions to sleep */
+    /* [lab4-ex1]
+     * (optional) depending on how you implement MLFQ,
+     * you may want to update attributes in PCB to reflect the status
+     */
+
+    /* (optional) TODO: your code here */
+
+#ifndef MLFQ
+    // for round-robin scheduler
+    proc_set[pid2idx(pid)].rr_sleep_begin = earth->gettime();
+    proc_set[pid2idx(pid)].rr_sleep_quantums = time_units;
+#else
+    // for MLFQ
+    mlfq_update(pid, PROC_ON_SLEEP, time_units);
+#endif
 }
 
 static float tar_time(int pid);

@@ -39,8 +39,21 @@ void soft_tlb_switch(int pid);
 uint soft_tlb_translate(int pid, uint vaddr);
 
 /* defined in mem_vm.c */
-void pmp_init();
 void vm_init();
+
+void pmp_init() {
+    /* FIXME: widely open permission; remove this */
+    asm("csrw pmpaddr0,%0" :: "r" (~0UL));
+    asm("csrw pmpcfg0,%0" :: "r"(0x1 << 3 /*A*/
+                                |0x7 /*R/W/X*/
+                                 ));
+
+    /* [lab4-ex5]
+     * TODO: set PMP memory protection */
+    /* Replace the PMP region above with a NAPOT region 0x80200000 - 0x80400000
+     * and set the permission for user mode access as r/w/x. */
+}
+
 
 void mmu_init() {
     earth->mmu_alloc       = mmu_alloc;
@@ -51,4 +64,6 @@ void mmu_init() {
     earth->mmu_map       = soft_tlb_map;
     earth->mmu_switch    = soft_tlb_switch;
     earth->mmu_translate = soft_tlb_translate;
+
+    pmp_init();
 }
