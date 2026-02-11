@@ -3,8 +3,7 @@ set architecture riscv:rv32
 target remote 127.0.0.1:6640
 
 # set debug-file-directory build/release/
-add-symbol-file build/release/earth.elf
-add-symbol-file build/release/grass.elf
+add-symbol-file build/release/egos.elf
 
 set disassemble-next-line auto
 set riscv use-compressed-breakpoints no
