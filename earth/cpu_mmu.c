@@ -59,6 +59,7 @@ void mmu_init() {
     earth->mmu_alloc       = mmu_alloc;
     earth->mmu_flush_cache = flush_cache;
 
+#ifndef VMON
     earth->translation   = SOFT_TLB;
     earth->mmu_free      = soft_tlb_free;
     earth->mmu_map       = soft_tlb_map;
@@ -66,4 +67,8 @@ void mmu_init() {
     earth->mmu_translate = soft_tlb_translate;
 
     pmp_init();
+#else
+    earth->translation   = PAGE_TABLE;
+    vm_init();
+#endif
 }

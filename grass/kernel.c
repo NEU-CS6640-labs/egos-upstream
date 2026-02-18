@@ -39,6 +39,15 @@ void kernel_entry() {
     asm("csrw mepc, %0" ::"r"(proc_set[curr_proc_idx].mepc));
     memcpy((void*)(EGOS_STACK_TOP - 32 * 4), curr_saved, 32 * 4);
 
+
+#ifdef VMON
+    /* [lab5-ex1]
+     * TODO: when turning on virtual memory, switch
+     * all processes---system processes included---to U-mode
+     */
+
+
+#else
     /* [lab4-ex4]
      * when resuming an app, the kernel switches privilege level:
      * it updates mstatus.MPP to select the target mode:
@@ -48,6 +57,7 @@ void kernel_entry() {
 
     /* TODO: your code here */
 
+#endif
 } // will return to grass/kernel.s, which finally calls `mret`
 
 #define INTR_ID_SOFT_M  3
@@ -70,7 +80,15 @@ static void excp_entry(uint id) {
      */
 
     /* TODO: your code here */
-    FATAL("excp_entry: kernel got exception %d", id);
+
+
+
+
+    uint tmp_mepc=0, tmp_mtval=0;
+    asm("csrr %0, mepc" : "=r"(tmp_mepc));
+    asm("csrr %0, mtval" : "=r"(tmp_mtval));
+    FATAL("excp_entry: kernel got exception %d (pid=%d, mepc=0x%x, mtval=0x%x)",
+            id, curr_pid, tmp_mepc, tmp_mtval);
 }
 
 static void intr_entry(uint id) {

@@ -53,10 +53,6 @@ uint paddr_to_pgid(void *paddr) {
     return pgid;
 }
 
-int tmp_test(uint pgid) {
-    return bitmap_test(pgid);
-}
-
 void* pmalloc(int clear_page) {
     PMEM_LOCK();
     for (uint i = 0; i < APPS_PAGES_CNT; i++) {
@@ -79,5 +75,16 @@ void pfree(void *paddr) {
     uint pgid = paddr_to_pgid(paddr);
     bitmap_clear(pgid);
     PMEM_UNLOCK();
+}
+
+
+int num_free_pages() {
+    int count = 0;
+    for (uint i = 0; i < APPS_PAGES_CNT; i++) {
+        if (bitmap_test(i) == 0) {
+            count++;
+        }
+    }
+    return count;
 }
 

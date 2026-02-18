@@ -7,7 +7,9 @@ ENABLE_ULT ?= 1
 # [lab3]: TODO: change "NAIVE" to "MLFQ"
 SCHEDULER=NAIVE
 # [lab4]: TODO: change "SOFTINT" to "ECALL"
-SYSCALLFUNC=SOFTINT
+SYSCALLFUNC=ECALL
+# [lab5]: TODO: change  "VMOFF" to "VMON"
+IFVM=VMOFF
 
 QEMU        = qemu-system-riscv32
 
@@ -50,7 +52,7 @@ egos: $(USRAPP_ELFS) $(SYSAPP_ELFS) $(ULT_ELF) $(RELEASE)/egos.elf
 
 $(RELEASE)/egos.elf: $(EGOS_DEPS)
 	@printf "$(YELLOW)-------- Compile EGOS --------$(END)\n"
-	$(RISCV_CC) $(CFLAGS) $(INCLUDE) -DKERNEL -D$(SCHEDULER) -D$(SYSCALLFUNC)\
+	$(RISCV_CC) $(CFLAGS) $(INCLUDE) -DKERNEL -D$(SCHEDULER) -D$(SYSCALLFUNC) -D$(IFVM)\
 		$(filter %.s, $(wildcard $^)) $(filter %.c, $(wildcard $^)) -Tlibrary/elf/egos.lds $(LDFLAGS) -o $@
 	@$(OBJDUMP) $(DEBUG_FLAGS) $@ > $(DEBUG)/egos.lst
 
