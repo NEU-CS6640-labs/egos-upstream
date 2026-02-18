@@ -44,7 +44,7 @@ void elf_load(int pid, elf_reader reader, int argc, void** argv) {
             memcpy(PAGE_ID_TO_ADDR(ppage_id) + (off % PAGE_SIZE), buf, size);
         }
 
-        while (curr_pageno < end_pageno) {
+        while (curr_pageno <= end_pageno) {
             uint ppage_id = earth->mmu_alloc();
             earth->mmu_map(pid, curr_pageno++, ppage_id);
             memset(PAGE_ID_TO_ADDR(ppage_id), 0, PAGE_SIZE);
