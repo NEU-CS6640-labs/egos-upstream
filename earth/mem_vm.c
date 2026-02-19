@@ -69,7 +69,7 @@ void setup_identity_region(int pid, uint addr, int npages, uint flag) {
 }
 
 
-/* [lab5-ex1]
+/* [lab5-ex2]
  * Walk the page table rooted at `root` to translate virtual address `va`,
  * and return the address of the L2 PTE corresponding to `va`.
  *
@@ -103,7 +103,7 @@ void page_table_map(int pid, uint vpage_no, uint ppage_id) {
 
     uint *root = pid_to_pagetable_base[pid];
 
-    /* [lab5-ex1]
+    /* [lab5-ex2]
      * Establish a mapping from virtual address `va` to physical address `pa`
      * for process `pid`.
      *
@@ -150,7 +150,7 @@ void page_table_map(int pid, uint vpage_no, uint ppage_id) {
 }
 
 
-/* [lab5-ex2]
+/* [lab5-ex3]
  * Switch the active address space to process `pid`.
  *
  * Hints: * Use assembly (`asm`) to update the `satp` CSR.
@@ -167,7 +167,7 @@ void page_table_switch(int pid) {
     fence();
 }
 
-/* [lab5-ex3]
+/* [lab5-ex4]
  * Translate the virtual address `va` to its corresponding physical address
  * and return the resulting physical address.
  */
@@ -180,7 +180,7 @@ uint page_table_translate(int pid, uint va) {
 
 
 
-/* [lab5-ex4]
+/* [lab5-ex5]
  * Release the page table and free all associated pages.
  */
 void page_table_free(int pid) {
