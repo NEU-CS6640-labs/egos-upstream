@@ -7,7 +7,7 @@ ENABLE_ULT ?= 1
 # [lab3]: TODO: change "NAIVE" to "MLFQ"
 SCHEDULER=NAIVE
 # [lab4]: TODO: change "SOFTINT" to "ECALL"
-SYSCALLFUNC=ECALL
+SYSCALLFUNC=SOFTINT
 # [lab5]: TODO: change  "VMOFF" to "VMON"
 IFVM=VMOFF
 
