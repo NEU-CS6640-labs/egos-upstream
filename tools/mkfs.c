@@ -129,7 +129,8 @@ int main() {
     /* Generate the disk image file. */
     int fd  = open("disk.img", O_CREAT | O_WRONLY, 0666);
     int sz1 = write(fd, exec, SIZE_2MB);
-    sz1 += write(fd, fs, SIZE_2MB);
+    for (uint i = 0; i < 15; i++) sz1 += write(fd, fs, SIZE_2MB);
+    /* Pad the image to 32MB */
     close(fd);
 
     /* Generate the QEMU ROM image file. */
@@ -139,7 +140,7 @@ int main() {
     /* Simply pad the image to 32MB which is required by QEMU. */
     close(fd);
 
-    assert(sz1 == SIZE_2MB * 2 && sz2 == SIZE_2MB * 16);
+    assert(sz1 == SIZE_2MB * 16 && sz2 == SIZE_2MB * 16);
     printf("[INFO] Finish making the image files\n");
     return 0;
 }
