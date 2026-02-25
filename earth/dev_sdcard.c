@@ -134,6 +134,7 @@ static void sdhci_single_read(uint block_no, char* dst) {
     uint  lba  = 0;   /* TODO: set block address for `block_no` */
     uchar flag = 0;   /* TODO: set command flags (data-present required) */
     uint  mode = 0;   /* TODO: set mode (see Transfer Mode bits, line 32) */
+    /* TODO: call sdhci_exec_cmd() with proper arguments */
 
     /* copy contents to the dst memory */
     memcpy(dst, aligned_buf, BLOCK_SIZE);
