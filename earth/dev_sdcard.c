@@ -109,17 +109,31 @@ static void sdhci_exec_cmd(uint cmd, uint arg, uchar flag, uint mode) {
 
 
 /* read one block from `block_no` and copy its contents to `dst` */
-static void sdhci_read(uint block_no, char* dst) {
+static void sdhci_single_read(uint block_no, char* dst) {
     /* Prepare DMA (SDMA mode of SDHCI). */
     REGW(SDHCI_BASE, SDHCI_DMA_ADDRESS)      = (uint)aligned_buf;
     REGW(SDHCI_BASE, SDHCI_BLK_CNT_AND_SIZE) = (1u << 16) | BLOCK_SIZE;
 
+
+
+    /* [lab6-ex1]
+     * Configure and issue a data command.
+     *
+     * - cmd:   command index (e.g., CMD17 for single-block read)
+     * - lba:   logical block address corresponding to `block_no`.
+     * - flag:  command configuration bits; must set the data-present bit
+     *          to indicate an associated data phase. Response/error checks
+     *          are omitted in this lab.
+     * - mode:  transfer mode; (1) enable DMA and (2) specify read direction.
+     */
+
     /* Send and wait for a read request with command #17. */
-    uint cmd = 17;
-    uint lba = block_no * BLOCK_SIZE;
-    uchar flag = DATA_PRESENT_FLAG;
-    uint mode = TM_READ | TM_DMA_EN;
-    sdhci_exec_cmd(17, lba, flag, mode);
+    FATAL("sdhci_single_read is not complete");
+
+    uint  cmd  = 0;   /* TODO: set command index */
+    uint  lba  = 0;   /* TODO: set block address for `block_no` */
+    uchar flag = 0;   /* TODO: set command flags (data-present required) */
+    uint  mode = 0;   /* TODO: set mode (see Transfer Mode bits, line 32) */
 
     /* copy contents to the dst memory */
     memcpy(dst, aligned_buf, BLOCK_SIZE);
@@ -138,11 +152,11 @@ static void sdhci_read(uint block_no, char* dst) {
  *    -- SDHCI_DMA_ADDRESS: set to the DMA buffer address.
  *    -- SDHCI_BLK_CNT_AND_SIZE: set both block count and block size
  *  - Issue CMD24: invoke `sdhci_exec_cmd()` with the correct argument
- *  - hint: refer to implementation of `sdhci_read()`
+ *  - hint: refer to implementation of `sdhci_single_ead()`
  */
-void sdhci_write(uint block_no, char *src) {
+void sdhci_single_write(uint block_no, char *src) {
     /* TODO: your code here. */
-    FATAL("sdhci_write is not implemented");
+    FATAL("sdhci_single_write is not implemented");
 
 }
 
@@ -195,7 +209,7 @@ static void sdhci_multi_write(uint offset, int nblocks, char* src) {
 void sd_read(uint block_no, uint nblocks, char* dst) {
     ASSERT(nblocks > 0, "negative nblocks number");
     if (nblocks == 1) {
-        sdhci_read(block_no, dst);
+        sdhci_single_read(block_no, dst);
     } else {
         sdhci_multi_read(block_no, nblocks, dst);
     }
@@ -204,7 +218,7 @@ void sd_read(uint block_no, uint nblocks, char* dst) {
 void sd_write(uint block_no, uint nblocks, char* src) {
     ASSERT(nblocks > 0, "negative nblocks number");
     if (nblocks == 1) {
-        sdhci_write(block_no, src);
+        sdhci_single_write(block_no, src);
     } else {
         sdhci_multi_write(block_no, nblocks, src);
     }
