@@ -198,7 +198,7 @@ static void sdhci_multi_read(uint block_no, int nblocks, char* dst) {
  *    program SDHCI_DMA_ADDRESS and SDHCI_BLK_CNT_AND_SIZE, then issue the command.
  *  - adjust the command index and transfer mode flags for a write
  */
-static void sdhci_multi_write(uint offset, int nblocks, char* src) {
+static void sdhci_multi_write(uint block_no, int nblocks, char* src) {
     ASSERT(nblocks <= (PAGE_SIZE / BLOCK_SIZE), "write too many blocks");
 
     /* TODO: your code here */
