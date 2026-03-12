@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
 
     /* Read and print the first block of the inode. */
     char buf[BLOCK_SIZE];
-    file_read(file_ino, 0, buf);
+    file_read(file_ino, 0, BLOCK_SIZE, buf);
     printf("%s", buf);
     if (buf[strlen(buf) - 1] != '\n') printf("\n\r");
 

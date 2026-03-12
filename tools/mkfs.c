@@ -11,7 +11,6 @@
  * The QEMU ROM image should be exactly 32MB with 16 x 2MB blocks.
  */
 
-#include <stdio.h>
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
@@ -21,6 +20,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include "inode.h"
+#include "fs.h"
+
+#undef printf  // cancel my_printf definition
+#include <stdio.h>
 
 char* egos_binaries[] = {"./egos.bin",
                          "../build/release/sys_proc.elf",
@@ -33,8 +36,8 @@ char* egos_binaries[] = {"./egos.bin",
 char bin_dir[256] = "./   6 ../   0 ";
 char* contents[]  = {
     "./   0 ../   0 home/   1 bin/   6 ",
-    "./   1 ../   0 cs6640/   2 ta/    3 fs/       4 ",
-    "./   2 ../   1 README   5 ",
+    "./   1 ../   0 cs6640/ 2 ta/    3 fs/       4 ",
+    "./   2 ../   1 README  5 rwfs/  128 ",
     "./   3 ../   1 ",
     "./   4 ../   1 ",
     "Welcome to CS6640 labs. \nThis OS is tailored from egos-2000 (https://github.com/yhzhang0128/egos-2000).\n",
@@ -43,6 +46,7 @@ char* contents[]  = {
 
 char inode[SIZE_2MB], tmp[512];
 char exec[SIZE_2MB], fs[SIZE_2MB];
+char rwfs[SIZE_2MB];
 
 int load_file(char* file_name, char* dst) {
     struct stat st;
@@ -73,6 +77,8 @@ int ramwrite(inode_intf bs, uint ino, uint offset, block_t* block) {
     memcpy(fs + offset * BLOCK_SIZE, block, BLOCK_SIZE);
     return 0;
 }
+
+void mkrwfs();
 
 int main() {
     /* Write the kernel and system server binaries into exec[]. */
@@ -126,10 +132,16 @@ int main() {
     filesys->write(filesys, BIN_DIR_INODE, 0, (void*)bin_dir);
     printf("[INFO] Load ino=%ld, %s\n", BIN_DIR_INODE, bin_dir);
 
+#ifdef RWFSON
+    mkrwfs();
+#endif
+
     /* Generate the disk image file. */
     int fd  = open("disk.img", O_CREAT | O_WRONLY, 0666);
     int sz1 = write(fd, exec, SIZE_2MB);
-    for (uint i = 0; i < 15; i++) sz1 += write(fd, fs, SIZE_2MB);
+    sz1 += write(fd, fs, SIZE_2MB);
+    sz1 += write(fd, rwfs, SIZE_2MB); // write rwfs
+    for (uint i = 0; i < 13; i++) sz1 += write(fd, fs, SIZE_2MB);
     /* Pad the image to 32MB */
     close(fd);
 
@@ -143,4 +155,115 @@ int main() {
     assert(sz1 == SIZE_2MB * 16 && sz2 == SIZE_2MB * 16);
     printf("[INFO] Finish making the image files\n");
     return 0;
+}
+
+static void mk_entry(dirent_t* entries, int i, int inum, char *name) {
+    entries[i].valid = 1;
+    entries[i].inum = inum;
+    strcpy(entries[i].name, name);
+}
+
+void mkrwfs() {
+    super_t *super = (super_t*)rwfs;
+    super->magic = 0x6640;
+    super->total_blks = sizeof(rwfs) / BLOCK_SIZE;
+
+    unsigned char *map = (unsigned char*) &rwfs[BLOCK_SIZE];
+    // 0: super block
+    // 1: bitmap
+    // 2--11: inodes
+    // 12+0: root data block
+    // +1: file1 data block
+    // +2: dir1 data block
+    // +3: file2 indirect block
+    // +4-+13: file2 data block1--10
+    // +14: file2 first indirect data block (12+14=26)
+    // total: 27
+    for (int i=0; i<27; i++) {
+        map[i/8] |= (1 << (i%8));
+    }
+
+    inode_t *inodes = (inode_t*) &rwfs[INODEARR_BLOCK_START * BLOCK_SIZE];
+
+    int root_ino = 0;  /* root-> /home/cs6640/rwfs/ */
+    int root_data_blk = DATA_BLOCK_START;
+    int file1_ino = 1;
+    int file1_data_blk = DATA_BLOCK_START + 1;
+    int dir1_ino = 2;
+    int dir1_data_blk = DATA_BLOCK_START + 2;
+    int file2_ino = 3;
+    int file2_indirect_blk = DATA_BLOCK_START + 3;
+    int file2_data_blks[11] = {
+        DATA_BLOCK_START + 4,
+        DATA_BLOCK_START + 5,
+        DATA_BLOCK_START + 6,
+        DATA_BLOCK_START + 7,
+        DATA_BLOCK_START + 8,
+        DATA_BLOCK_START + 9,
+        DATA_BLOCK_START + 10,
+        DATA_BLOCK_START + 11,
+        DATA_BLOCK_START + 12,
+        DATA_BLOCK_START + 13,
+        DATA_BLOCK_START + 14,
+    };
+    dirent_t *entries;
+    char *data;
+
+    // root
+    inode_t *root = &inodes[root_ino];
+    root->mode = MODE_D | MODE_ALL;
+    root->pads[0] = 0xdeadbeef;
+    root->ptrs[0] = root_data_blk;
+    entries = (dirent_t*) &rwfs[BLOCK_SIZE*root_data_blk];
+    mk_entry(entries, 0, root_ino, ".");
+    mk_entry(entries, 1, 2, "..");  /* ..-> /home/cs6640/ */
+    //   root/file1.txt
+    mk_entry(entries, 2, file1_ino, "file1.txt");
+    //   root/dir1
+    mk_entry(entries, 3, dir1_ino, "dir1");
+    root->size = 4 * sizeof(dirent_t);
+
+    // dir1
+    inode_t *dir1 = &inodes[dir1_ino];
+    dir1->mode = MODE_D | MODE_ALL;
+    dir1->pads[0] = 0xdeadbeef;
+    dir1->ptrs[0] = dir1_data_blk;
+    //   dir1/file2.txt
+    entries = (dirent_t*) &rwfs[BLOCK_SIZE*dir1_data_blk];
+    mk_entry(entries, 0, dir1_ino, ".");
+    mk_entry(entries, 1, root_ino, "..");
+    mk_entry(entries, 2, file2_ino, "file2.txt");
+    dir1->size = 3 * sizeof(dirent_t);
+
+    // file1.txt
+    inode_t *file1 = &inodes[file1_ino];
+    file1->mode = MODE_F | MODE_ALL;
+    file1->pads[0] = 0xdeadbeef;
+    file1->ptrs[0] = file1_data_blk;
+    // contents
+    data= (char*) &rwfs[BLOCK_SIZE*file1_data_blk];
+    strcpy(data, "hello world");
+    file1->size = strlen("hello world");
+
+    // file2.txt
+    inode_t *file2 = &inodes[file2_ino];
+    file2->mode = MODE_F | MODE_ALL;
+    file2->pads[0] = 0xdeadbeef;
+    file2->indirect_ptr = file2_indirect_blk;
+    for (int i=0; i<NUM_PTRS; i++) { // direct data block
+        file2->ptrs[i] = file2_data_blks[i];
+    }
+    // indirect data blocks
+    * ((uint*) &rwfs[BLOCK_SIZE*file2_indirect_blk]) = file2_data_blks[10];
+
+    // contents
+    char hex[] = "0123456789abcdef,";
+    int fsz = BLOCK_SIZE * 11;
+
+    char *start = (char*) &rwfs[BLOCK_SIZE*file2_data_blks[0]];
+    for (int i=0; i<fsz/17; i++) {
+        memcpy(start, hex, 17);
+        start += 17;
+    }
+    file2->size = fsz;
 }

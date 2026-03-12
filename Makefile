@@ -12,6 +12,8 @@ SYSCALLFUNC=SOFTINT
 IFVM=VMOFF
 # [lab6]: TODO: change  "FLASH" to "SDCARD"
 DISK=FLASH
+# [lab7]: TODO: change  "RWFSOFF" to "RWFSON"
+RWFS=RWFSOFF
 
 QEMU        = qemu-system-riscv32
 
@@ -54,19 +56,19 @@ egos: $(USRAPP_ELFS) $(SYSAPP_ELFS) $(ULT_ELF) $(RELEASE)/egos.elf
 
 $(RELEASE)/egos.elf: $(EGOS_DEPS)
 	@printf "$(YELLOW)-------- Compile EGOS --------$(END)\n"
-	$(RISCV_CC) $(CFLAGS) $(INCLUDE) -DKERNEL -D$(SCHEDULER) -D$(SYSCALLFUNC) -D$(IFVM) -D$(DISK) \
+	$(RISCV_CC) $(CFLAGS) $(INCLUDE) -DKERNEL -D$(SCHEDULER) -D$(SYSCALLFUNC) -D$(IFVM) -D$(DISK) -D$(RWFS) \
 		$(filter %.s, $(wildcard $^)) $(filter %.c, $(wildcard $^)) -Tlibrary/elf/egos.lds $(LDFLAGS) -o $@
 	@$(OBJDUMP) $(DEBUG_FLAGS) $@ > $(DEBUG)/egos.lst
 
 $(SYSAPP_ELFS): $(RELEASE)/%.elf : apps/system/%.c $(APPS_DEPS)
 	@printf "Compile app $(CYAN)%s$(END) => %s\n" $(patsubst %.c, %, $(notdir $<)) $@
-	@$(RISCV_CC) $(CFLAGS) $(INCLUDE) -DFILESYS=$(FILESYS) -DKERNEL -D$(SYSCALLFUNC) -Iapps apps/app.s $(filter %.c, $(wildcard $^)) -Tlibrary/elf/app.lds $(LDFLAGS) -o $@
+	@$(RISCV_CC) $(CFLAGS) $(INCLUDE) -DFILESYS=$(FILESYS) -DKERNEL -D$(SYSCALLFUNC) -D$(RWFS) -Iapps apps/app.s $(filter %.c, $(wildcard $^)) -Tlibrary/elf/app.lds $(LDFLAGS) -o $@
 	@$(OBJDUMP) $(DEBUG_FLAGS) $@ > $(patsubst %.c, $(DEBUG)/%.lst, $(notdir $<))
 
 $(USRAPP_ELFS): $(RELEASE)/user/%.elf : apps/user/%.c $(APPS_DEPS)
 	@mkdir -p $(DEBUG) $(RELEASE) $(RELEASE)/user
 	@printf "Compile app $(CYAN)%s$(END) => %s\n" $(patsubst %.c, %, $(notdir $<)) $@
-	@$(RISCV_CC) $(CFLAGS) $(INCLUDE) -D$(SYSCALLFUNC) -Iapps apps/app.s $(filter %.c, $(wildcard $^)) -Tlibrary/elf/app.lds $(LDFLAGS) -o $@
+	@$(RISCV_CC) $(CFLAGS) $(INCLUDE) -D$(SYSCALLFUNC) -D$(RWFS) -Iapps apps/app.s $(filter %.c, $(wildcard $^)) -Tlibrary/elf/app.lds $(LDFLAGS) -o $@
 	@$(OBJDUMP) $(DEBUG_FLAGS) $@ > $(patsubst %.c, $(DEBUG)/%.lst, $(notdir $<))
 
 $(RELEASE)/user/ult.elf: apps/user/ult.c apps/user/ult_test.c apps/user/thread.s $(APPS_DEPS)
@@ -77,7 +79,7 @@ $(RELEASE)/user/ult.elf: apps/user/ult.c apps/user/ult_test.c apps/user/thread.s
 install: egos
 	@printf "$(GREEN)-------- Create the Disk & ROM Images --------$(END)\n"
 	$(OBJCOPY) -O binary $(RELEASE)/egos.elf tools/egos.bin
-	$(CC) tools/mkfs.c library/file/file$(FILESYS).c -DMKFS -DFILESYS=$(FILESYS) $(INCLUDE) -o tools/mkfs
+	$(CC) tools/mkfs.c library/file/file$(FILESYS).c -DMKFS -DFILESYS=$(FILESYS) -D$(RWFS) $(INCLUDE) -o tools/mkfs
 	cd tools; rm -f disk.img qemuROM.bin; ./mkfs
 
 QEMU_MACHINE = -M virt -smp 1 -m 8M -bios tools/egos.bin

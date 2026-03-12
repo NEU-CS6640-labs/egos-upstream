@@ -4,7 +4,9 @@ void exit(int status);
 int term_read(char* buf, uint len);
 void term_write(char* str, uint len);
 int dir_lookup(int dir_ino, char* name);
-int file_read(int file_ino, uint offset, char* block);
+int file_read(int file_ino, uint offset, uint len, char* buf);
+int file_write(int file_ino, uint offset, uint len, char* buf);
+int file_getsize(int file_ino, uint* fsize);
 
 enum grass_servers {
     GPID_ALL = -1,
@@ -31,7 +33,7 @@ struct proc_reply {
 };
 
 /* GPID_TERMINAL */
-#define TERM_BUF_SIZE 512
+#define TERM_BUF_SIZE 1024
 struct term_request {
     enum { TERM_INPUT, TERM_OUTPUT } type;
     uint len;
@@ -50,9 +52,12 @@ struct file_request {
         FILE_UNUSED,
         FILE_READ,
         FILE_WRITE,
+        FILE_GETSIZE,
+        DIR_LOOKUP,
     } type;
     uint ino;
     uint offset;
+    uint len;
     block_t block;
 };
 

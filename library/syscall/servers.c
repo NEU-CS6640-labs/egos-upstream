@@ -8,6 +8,7 @@
 #include "egos.h"
 #include "syscall.h"
 #include <stdlib.h>
+#include "fs.h"
 
 static int sender;
 static char buf[SYSCALL_MSG_LEN];
@@ -20,33 +21,86 @@ void exit(int status) {
 }
 
 int dir_lookup(int dir_ino, char* name) {
-    char buf[BLOCK_SIZE];
-    file_read(dir_ino, 0, buf);
+    if (dir_ino < NINODES) { // RO fs
+        char buf[BLOCK_SIZE];
+        file_read(dir_ino, 0, BLOCK_SIZE, buf);
 
-    /* Read tools/mkfs.c to understand directory management. */
-    for (uint i = 0, namelen = strlen(name); i < strlen(buf) - namelen; i++) {
-        if (!strncmp(name, buf + i, namelen) &&
-            buf[i + namelen] == ' ' &&
-            (i == 0 || buf[i - 1] == ' ')) {
-            return atoi(buf + i + namelen);
+        /* Read tools/mkfs.c to understand directory management. */
+        for (uint i = 0, namelen = strlen(name); i < strlen(buf) - namelen; i++) {
+            if (!strncmp(name, buf + i, namelen) &&
+                    buf[i + namelen] == ' ' &&
+                    (i == 0 || buf[i - 1] == ' ')) {
+                return atoi(buf + i + namelen);
+            }
         }
+    } else { // RW fs
+#ifdef RWFSON
+        struct file_request req;
+        req.type   = DIR_LOOKUP;
+        req.ino    = dir_ino;
+        strcpy(req.block.bytes, name);
+
+        sys_send(GPID_FILE, (void*)&req, sizeof(req));
+        sys_recv(GPID_FILE, &sender, buf, SYSCALL_MSG_LEN);
+
+        struct file_reply* reply = (void*)buf;
+        int ino = *(uint*)reply->block.bytes; // store the inode number in the first 4B
+        return ino;
+#else
+        FATAL("RWFS is off; should not be here");
+#endif
     }
 
     return -1;
 }
 
-int file_read(int file_ino, uint offset, char* block) {
+int file_read(int file_ino, uint offset, uint len, char* dst) {
+    ASSERT(len <= BLOCK_SIZE, "len is greater than 1 block");
+
     struct file_request req;
     req.type   = FILE_READ;
     req.ino    = file_ino;
     req.offset = offset;
+    req.len    = len;
 
     sys_send(GPID_FILE, (void*)&req, sizeof(req));
     sys_recv(GPID_FILE, &sender, buf, SYSCALL_MSG_LEN);
 
     struct file_reply* reply = (void*)buf;
-    memcpy(block, reply->block.bytes, BLOCK_SIZE);
+    memcpy(dst, reply->block.bytes, len);
 
+    return reply->status == FILE_OK ? 0 : -1;
+}
+
+int file_write(int file_ino, uint offset, uint len, char* src) {
+    ASSERT(len <= BLOCK_SIZE, "len is greater than 1 block");
+
+    struct file_request req;
+    req.type   = FILE_WRITE;
+    req.ino    = file_ino;
+    req.offset = offset;
+    req.len    = len;
+
+    memcpy(req.block.bytes, src, len);
+
+    sys_send(GPID_FILE, (void*)&req, sizeof(req));
+    sys_recv(GPID_FILE, &sender, buf, SYSCALL_MSG_LEN);
+
+    struct file_reply* reply = (void*)buf;
+    return reply->status == FILE_OK ? 0 : -1;
+}
+
+
+int file_getsize(int file_ino, uint* fsz) {
+    struct file_request req;
+    req.type   = FILE_GETSIZE;
+    req.ino    = file_ino;
+
+    sys_send(GPID_FILE, (void*)&req, sizeof(req));
+    sys_recv(GPID_FILE, &sender, buf, SYSCALL_MSG_LEN);
+
+    struct file_reply* reply = (void*)buf;
+    *fsz = *(uint*)reply->block.bytes; // store the size in the first 4B
     return reply->status == FILE_OK ? 0 : -1;
 }
 
