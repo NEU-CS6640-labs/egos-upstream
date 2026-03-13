@@ -50,7 +50,7 @@ typedef struct fs_struct {
     super_t superblk;
     uint avail_blks;
 
-    // help transalte between local inode number to global inode number
+    // help translate between local inode numbers to global inode numbers
     uint ino_offset;
     // disk read/write functions
     int (*disk_read)(inode_intf bs, uint ino, uint offset, block_t* block);
