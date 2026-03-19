@@ -100,7 +100,8 @@ int fs_dir_lookup(int g_dir_ino, const char *path) {
         if (inode->mode & MODE_D) {
             // inum is the next file
             inum = lookup_name(inode, token);
-            if (inum < 0) {return inum;}
+            if (inum == ROOT_PARENT_L_INO) {return ROOT_PARENT_G_INO;} /* return to parent fs */
+            if (inum < 0) {return inum;}  /* hitting erros */
         } else { // should not see regular file
             INFO("ERROR: This is a regular file");
             free(_path);

@@ -216,7 +216,7 @@ void mkrwfs() {
     root->ptrs[0] = root_data_blk;
     entries = (dirent_t*) &rwfs[BLOCK_SIZE*root_data_blk];
     mk_entry(entries, 0, root_ino, ".");
-    mk_entry(entries, 1, 2, "..");  /* ..-> /home/cs6640/ */
+    mk_entry(entries, 1, ROOT_PARENT_L_INO, "..");  /* ..-> /home/cs6640/ */
     //   root/file1.txt
     mk_entry(entries, 2, file1_ino, "file1.txt");
     //   root/dir1

@@ -3,6 +3,11 @@
 #include "disk.h"
 #include "inode.h"
 
+/* a fake inode number pointing to the parent of rwfs mount point */
+#define ROOT_PARENT_L_INO   6640
+/* global inode number for the parent of rwfs (see mkfs.c) */
+#define ROOT_PARENT_G_INO   2
+
 /* how many buckets of size M do you need to hold N items? */
 #define DIV_ROUND_UP(N, M) ((N) + (M) - 1) / (M)
 /* number of direct pointers */
